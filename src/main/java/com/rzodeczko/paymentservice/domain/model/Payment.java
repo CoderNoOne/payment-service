@@ -98,4 +98,8 @@ public class Payment {
     public PaymentStatus getStatus() {
         return status;
     }
+
+    public boolean isPaid() {
+        return this.status == PaymentStatus.PAID;
+    }
 }
