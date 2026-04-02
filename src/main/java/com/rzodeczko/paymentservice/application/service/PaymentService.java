@@ -16,19 +16,43 @@ import com.rzodeczko.paymentservice.domain.repository.PaymentRepository;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-// Serwis odbiera polecenie, pyta domenę co zrobić, zapisuje wynik przez repozytoria, wywołuje porty zewnętrzne. Sam
-// nic nie liczy i nic nie decyduje — tylko koordynuje.
+/**
+ * Application service implementing payment use cases.
+ *
+ * <p>This service orchestrates domain objects, repositories, and external gateway ports.
+ * It coordinates flow but keeps business rules in domain models and collaborating components.
+ */
 public class PaymentService implements PaymentUseCase {
     private final PaymentRepository paymentRepository;
     private final PaymentGatewayPort paymentGatewayPort;
     private final OutboxEventRepository outboxEventRepository;
 
+    /**
+     * Creates a payment application service.
+     *
+     * @param paymentRepository     repository used to load and persist payments
+     * @param paymentGatewayPort    port used to register transactions and verify gateway data
+     * @param outboxEventRepository repository used to persist integration outbox events
+     */
     public PaymentService(PaymentRepository paymentRepository, PaymentGatewayPort paymentGatewayPort, OutboxEventRepository outboxEventRepository) {
         this.paymentRepository = paymentRepository;
         this.paymentGatewayPort = paymentGatewayPort;
         this.outboxEventRepository = outboxEventRepository;
     }
 
+    /**
+     * Initializes a payment for a given order.
+     *
+     * <p>If a payment already exists for the order, returns existing payment details.
+     * Otherwise registers a new transaction in the gateway, creates a new pending payment,
+     * persists it, and returns initialization data.
+     *
+     * @param orderId unique identifier of the order
+     * @param amount  requested payment amount
+     * @param email   customer email passed to the gateway
+     * @param name    customer name passed to the gateway
+     * @return payment initialization result containing payment ID and redirect URL
+     */
     @Override
     public InitPaymentResult initPayment(UUID orderId, BigDecimal amount, String email, String name) {
         return paymentRepository
@@ -47,6 +71,18 @@ public class PaymentService implements PaymentUseCase {
                 });
     }
 
+    /**
+     * Handles payment provider notification (webhook).
+     *
+     * <p>The method validates signature, resolves the payment by external transaction ID,
+     * enforces idempotency for already-paid payments, and then updates payment status based
+     * on notification data. For successful notifications it additionally verifies transaction
+     * status with the provider API and emits an outbox event.
+     *
+     * @param notification notification payload from payment gateway
+     * @throws InvalidNotificationSignatureException when webhook signature is invalid
+     * @throws PaymentNotFoundException              when no payment exists for provided external transaction ID
+     */
     @Override
     public void handleNotification(NotificationCommand notification) {
         if (!paymentGatewayPort.verifyNotificationSignature(notification)) {
@@ -57,13 +93,11 @@ public class PaymentService implements PaymentUseCase {
                 .findByExternalTransactionId(notification.trId())
                 .orElseThrow(() -> new PaymentNotFoundException(notification.trId()));
 
-        // Idempotency check — TPay może wysłać to samo powiadomienie wielokrotnie
         if (payment.isPaid()) {
             return;
         }
 
         if ("TRUE".equalsIgnoreCase(notification.trStatus())) {
-            // Podwójna weryfikacja przez API TPay — nie ufamy ślepo webhookowi
             boolean confirmed = paymentGatewayPort.verifyTransactionConfirmed(notification.trId());
             if (confirmed) {
                 payment.confirm();

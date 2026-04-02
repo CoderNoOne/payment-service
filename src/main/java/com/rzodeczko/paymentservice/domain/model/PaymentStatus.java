@@ -1,7 +1,15 @@
 package com.rzodeczko.paymentservice.domain.model;
 
+/**
+ * Current lifecycle status of a payment.
+ */
 public enum PaymentStatus {
-    PENDING, //Utworzona oczekuje  na realizacje
-    PAID, //płatność potwierdzona
-    FAILED //płatność odrzucona
+    /** Payment has been created and is waiting for provider confirmation. */
+    PENDING,
+
+    /** Payment has been successfully confirmed. */
+    PAID,
+
+    /** Payment was rejected or could not be completed. */
+    FAILED
 }
