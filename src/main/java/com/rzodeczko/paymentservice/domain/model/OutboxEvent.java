@@ -55,4 +55,32 @@ public class OutboxEvent {
             this.status = OutboxEventStatus.FAILED;
         }
     }
+
+    public UUID id() {
+        return id;
+    }
+
+    public UUID orderId() {
+        return orderId;
+    }
+
+    public UUID paymentId() {
+        return paymentId;
+    }
+
+    public OutboxEventStatus status() {
+        return status;
+    }
+
+    public int retryCount() {
+        return retryCount;
+    }
+
+    public Instant createdAt() {
+        return createdAt;
+    }
+
+    public Instant processedAt() {
+        return processedAt;
+    }
 }

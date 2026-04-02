@@ -27,7 +27,7 @@ public class Payment {
         this.orderId = orderId;
         this.amount = amount;
         this.externalTransactionId = externalTransactionId;
-        this.status = PaymentStatus.PENDING;
+        this.status = status;
         this.redirectUrl = redirectUrl;
         this.createdAt = createdAt;
     }
