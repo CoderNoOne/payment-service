@@ -2,6 +2,7 @@ package com.rzodeczko.paymentservice.infrastructure.persistence.mapper;
 
 
 import com.rzodeczko.paymentservice.domain.model.OutboxEvent;
+import com.rzodeczko.paymentservice.domain.model.OutboxEventStatus;
 import com.rzodeczko.paymentservice.infrastructure.persistence.entity.OutboxEventEntity;
 import org.springframework.stereotype.Component;
 

@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class OutboxEventTest {
 
@@ -21,13 +21,13 @@ class OutboxEventTest {
         OutboxEvent event = OutboxEvent.create(orderId, paymentId);
 
         // Assert
-        assertThat(event.id()).isNotNull();
-        assertThat(event.orderId()).isEqualTo(orderId);
-        assertThat(event.paymentId()).isEqualTo(paymentId);
-        assertThat(event.status()).isEqualTo(OutboxEventStatus.PENDING);
-        assertThat(event.retryCount()).isZero();
-        assertThat(event.createdAt()).isNotNull();
-        assertThat(event.processedAt()).isNull();
+        assertThat(event.getId()).isNotNull();
+        assertThat(event.getOrderId()).isEqualTo(orderId);
+        assertThat(event.getPaymentId()).isEqualTo(paymentId);
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+        assertThat(event.getRetryCount()).isZero();
+        assertThat(event.getCreatedAt()).isNotNull();
+        assertThat(event.getProcessedAt()).isNull();
     }
 
     @Test
@@ -41,8 +41,8 @@ class OutboxEventTest {
         event.markSent();
 
         // Assert
-        assertThat(event.status()).isEqualTo(OutboxEventStatus.SENT);
-        assertThat(event.processedAt()).isNotNull();
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.SENT);
+        assertThat(event.getProcessedAt()).isNotNull();
     }
 
     @Test
@@ -56,8 +56,8 @@ class OutboxEventTest {
         event.markFailed();
 
         // Assert
-        assertThat(event.status()).isEqualTo(OutboxEventStatus.PENDING);
-        assertThat(event.retryCount()).isEqualTo(1);
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+        assertThat(event.getRetryCount()).isEqualTo(1);
     }
 
     @Test
@@ -73,8 +73,8 @@ class OutboxEventTest {
         }
 
         // Assert
-        assertThat(event.status()).isEqualTo(OutboxEventStatus.FAILED);
-        assertThat(event.retryCount()).isEqualTo(5);
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.FAILED);
+        assertThat(event.getRetryCount()).isEqualTo(5);
     }
 
     @Test
@@ -90,8 +90,8 @@ class OutboxEventTest {
         }
 
         // Assert
-        assertThat(event.status()).isEqualTo(OutboxEventStatus.FAILED);
-        assertThat(event.retryCount()).isEqualTo(6); // retryCount continues to increase, but status is already FAILED
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.FAILED);
+        assertThat(event.getRetryCount()).isEqualTo(6); // retryCount continues to increase, but status is already FAILED
     }
 
     @Test
@@ -109,13 +109,13 @@ class OutboxEventTest {
         OutboxEvent event = new OutboxEvent(id, orderId, paymentId, status, retryCount, createdAt, processedAt);
 
         // Assert
-        assertThat(event.id()).isEqualTo(id);
-        assertThat(event.orderId()).isEqualTo(orderId);
-        assertThat(event.paymentId()).isEqualTo(paymentId);
-        assertThat(event.status()).isEqualTo(status);
-        assertThat(event.retryCount()).isEqualTo(retryCount);
-        assertThat(event.createdAt()).isEqualTo(createdAt);
-        assertThat(event.processedAt()).isEqualTo(processedAt);
+        assertThat(event.getId()).isEqualTo(id);
+        assertThat(event.getOrderId()).isEqualTo(orderId);
+        assertThat(event.getPaymentId()).isEqualTo(paymentId);
+        assertThat(event.getStatus()).isEqualTo(status);
+        assertThat(event.getRetryCount()).isEqualTo(retryCount);
+        assertThat(event.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(event.getProcessedAt()).isEqualTo(processedAt);
     }
 
 }

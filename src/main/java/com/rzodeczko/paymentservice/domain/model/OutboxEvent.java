@@ -87,38 +87,31 @@ public class OutboxEvent {
         }
     }
 
-    /** @return unique event identifier */
-    public UUID id() {
+    public UUID getId() {
         return id;
     }
 
-    /** @return related order identifier */
-    public UUID orderId() {
+    public UUID getOrderId() {
         return orderId;
     }
 
-    /** @return related payment identifier */
-    public UUID paymentId() {
+    public UUID getPaymentId() {
         return paymentId;
     }
 
-    /** @return current outbox event status */
-    public OutboxEventStatus status() {
+    public OutboxEventStatus getStatus() {
         return status;
     }
 
-    /** @return number of retry attempts */
-    public int retryCount() {
+    public int getRetryCount() {
         return retryCount;
     }
 
-    /** @return event creation timestamp */
-    public Instant createdAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    /** @return processing timestamp, or {@code null} if not processed yet */
-    public Instant processedAt() {
+    public Instant getProcessedAt() {
         return processedAt;
     }
 }
