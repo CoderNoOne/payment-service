@@ -3,8 +3,7 @@ package com.rzodeczko.paymentservice.application.port.input;
 /**
  * Command carrying data required to process a payment notification (webhook) from TPay.
  *
- * <p>In application terms, a command represents a write-side request that may change state.
- * This differs from a query (read request) and an event (something that has already happened).
+ *
  *
  * @param merchantId merchant identifier assigned by TPay
  * @param trId transaction identifier assigned by TPay; typically mapped to

@@ -3,6 +3,7 @@ package com.rzodeczko.paymentservice.infrastructure.persistence.adapter;
 import com.rzodeczko.paymentservice.domain.exception.PaymentAlreadyExistsException;
 import com.rzodeczko.paymentservice.domain.model.Payment;
 import com.rzodeczko.paymentservice.domain.repository.PaymentRepository;
+import com.rzodeczko.paymentservice.infrastructure.persistence.entity.PaymentEntity;
 import com.rzodeczko.paymentservice.infrastructure.persistence.mapper.PaymentMapper;
 import com.rzodeczko.paymentservice.infrastructure.persistence.repository.JpaPaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,12 +15,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Infrastructure adapter that implements the domain {@link PaymentRepository}
- * contract using Spring Data JPA.
+ * JPA-backed infrastructure adapter implementing the domain {@link PaymentRepository} port.
  *
- * <p>This adapter is responsible for mapping between domain objects and JPA
- * entities and for translating infrastructure exceptions into domain-specific
- * exceptions.</p>
+ * <p>The adapter owns two responsibilities at the infrastructure boundary:
+ * mapping between {@link Payment} aggregates and {@link PaymentEntity} persistence models,
+ * and translating storage-level exceptions into domain-level exceptions.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -28,23 +28,29 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     private final PaymentMapper paymentMapper;
 
     /**
-     * Persists a payment aggregate in the database.
+     * Persists a payment aggregate using upsert-like semantics keyed by payment identifier.
      *
-     * <p>Uses {@code saveAndFlush} to execute SQL immediately so integrity
-     * violations are raised within this adapter and can be mapped to
-     * domain-level exceptions.</p>
+     * <p>If an entity with the same {@code payment.id} already exists, only its status is updated.
+     * Otherwise a new entity is created from the aggregate. The operation uses
+     * {@code saveAndFlush(...)} to force SQL execution within this method, so constraint violations
+     * are raised in this adapter and can be translated deterministically.</p>
      *
      * @param payment payment aggregate to persist
-     * @return persisted payment aggregate
-     * @throws PaymentAlreadyExistsException when uniqueness constraints are violated
+     * @return persisted payment aggregate mapped back from the database entity
+     * @throws PaymentAlreadyExistsException when a uniqueness or integrity constraint is violated
      */
     @Override
     @Transactional
     public Payment save(Payment payment) {
         try {
-            // Flush immediately so constraint violations are thrown in this layer and can be translated to domain exceptions
+            PaymentEntity entity = jpaPaymentRepository.findById(payment.getId())
+                    .map(existing -> {
+                        existing.setStatus(payment.getStatus().name());
+                        return existing;
+                    })
+                    .orElseGet(() -> paymentMapper.toEntity(payment));
             return paymentMapper.toDomain(
-                    jpaPaymentRepository.saveAndFlush(paymentMapper.toEntity(payment))
+                    jpaPaymentRepository.saveAndFlush(entity)
             );
         } catch (DataIntegrityViolationException e) {
             throw new PaymentAlreadyExistsException(payment.getOrderId());
@@ -52,10 +58,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     /**
-     * Finds a payment by external transaction identifier assigned by the gateway.
+     * Retrieves a payment by provider-assigned external transaction identifier.
      *
-     * @param externalTransactionId gateway-side transaction identifier
-     * @return optional containing the matching payment when found
+     * @param externalTransactionId transaction identifier issued by the payment gateway
+     * @return {@link Optional#empty()} when no payment is associated with the given identifier;
+     * otherwise an optional containing the mapped domain aggregate
      */
     @Override
     @Transactional(readOnly = true)
@@ -66,10 +73,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     /**
-     * Finds a payment by internal order identifier.
+     * Retrieves a payment by internal order identifier.
      *
-     * @param orderId internal order identifier
-     * @return optional containing the matching payment when found
+     * @param orderId application-level order identifier correlated with the payment
+     * @return {@link Optional#empty()} when no payment exists for the order;
+     * otherwise an optional containing the mapped domain aggregate
      */
     @Override
     @Transactional(readOnly = true)

@@ -3,6 +3,7 @@ package com.rzodeczko.paymentservice.infrastructure.persistence.adapter;
 import com.rzodeczko.paymentservice.domain.model.OutboxEvent;
 import com.rzodeczko.paymentservice.domain.model.OutboxEventStatus;
 import com.rzodeczko.paymentservice.domain.repository.OutboxEventRepository;
+import com.rzodeczko.paymentservice.infrastructure.persistence.entity.OutboxEventEntity;
 import com.rzodeczko.paymentservice.infrastructure.persistence.mapper.OutboxEventMapper;
 import com.rzodeczko.paymentservice.infrastructure.persistence.repository.JpaOutboxEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,11 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Infrastructure adapter that implements the domain {@link OutboxEventRepository}
- * contract using Spring Data JPA.
+ * Infrastructure adapter implementing the domain {@link OutboxEventRepository}
+ * contract with Spring Data JPA.
  *
- * <p>This adapter maps outbox events between domain and persistence models and
- * provides status-based access for asynchronous dispatch processing.</p>
+ * <p>The adapter maps outbox events between domain and persistence models and
+ * exposes status-based queries used by asynchronous dispatch processing.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -26,20 +27,34 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
     private final OutboxEventMapper outboxEventMapper;
 
     /**
-     * Persists an outbox event in the database.
+     * Saves an outbox event.
      *
-     * @param event outbox event to persist
+     * <p>If an event with the same identifier already exists, its mutable fields
+     * are updated (status, retry count and processed timestamp). Otherwise, a new
+     * record is created.</p>
+     *
+     * @param event outbox event to create or update
      */
     @Override
     @Transactional
     public void save(OutboxEvent event) {
-        jpaOutboxEventRepository.saveAndFlush(outboxEventMapper.toEntity(event));
+        jpaOutboxEventRepository.findById(event.getId())
+                .map(existing -> {
+                    existing.setStatus(event.getStatus().name());
+                    existing.setRetryCount(event.getRetryCount());
+                    existing.setProcessedAt(event.getProcessedAt());
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    OutboxEventEntity newEntity = outboxEventMapper.toEntity(event);
+                    return jpaOutboxEventRepository.saveAndFlush(newEntity);
+                });
     }
 
     /**
-     * Retrieves all outbox events that are pending dispatch.
+     * Retrieves all outbox events marked as pending dispatch.
      *
-     * @return list of pending outbox events mapped to the domain model
+     * @return pending outbox events mapped to the domain model
      */
     @Override
     @Transactional(readOnly = true)
