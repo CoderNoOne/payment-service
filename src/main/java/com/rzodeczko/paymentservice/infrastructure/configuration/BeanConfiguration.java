@@ -1,23 +1,51 @@
 package com.rzodeczko.paymentservice.infrastructure.configuration;
 
 import com.rzodeczko.paymentservice.infrastructure.configuration.properties.TPayProperties;
+import net.javacrumbs.shedlock.core.LockProvider;
+import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
+import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.restclient.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 
 /**
- * Spring configuration for infrastructure-level beans used by outbound HTTP
- * integrations.
+ * Spring infrastructure configuration.
+ *
+ * <p>Registers application-wide beans for outbound HTTP communication and distributed
+ * scheduler locking. Configuration properties for TPay integration are enabled here as well.</p>
  */
 @Configuration
 @EnableConfigurationProperties({TPayProperties.class})
+@EnableScheduling
+@EnableSchedulerLock(defaultLockAtMostFor = "10m")
 public class BeanConfiguration {
+
+    /**
+     * Creates a ShedLock {@link LockProvider} backed by the application's main database.
+     *
+     * <p>The provider stores lock state in the {@code shedlock} table and uses database time
+     * ({@code usingDbTime}) instead of node-local JVM time, which avoids clock-skew issues
+     * across multiple service instances.</p>
+     *
+     * @param jdbcTemplate JDBC template connected to the primary application datasource
+     * @return JDBC-based ShedLock provider
+     */
+    @Bean
+    public LockProvider lockProvider(JdbcTemplate jdbcTemplate) {
+        return new JdbcTemplateLockProvider(JdbcTemplateLockProvider.Configuration.builder()
+                .withJdbcTemplate(jdbcTemplate)
+                .usingDbTime()
+                .build());
+    }
+
 
     /**
      * Configures a shared {@code RestClientCustomizer} backed by JDK HttpClient
