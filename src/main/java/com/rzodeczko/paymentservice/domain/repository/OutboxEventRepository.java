@@ -26,4 +26,12 @@ public interface OutboxEventRepository {
      * @return list of pending outbox events eligible for publishing
      */
     List<OutboxEvent> findAllPending();
+
+    /**
+     * Retrieves up to {@code limit} outbox events that are still pending dispatch.
+     *
+     * @param limit maximum number of pending outbox events to retrieve
+     * @return list of pending outbox events eligible for publishing
+     */
+    List<OutboxEvent> findPending(int limit);
 }

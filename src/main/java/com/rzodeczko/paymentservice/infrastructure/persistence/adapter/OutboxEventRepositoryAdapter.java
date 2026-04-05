@@ -7,6 +7,8 @@ import com.rzodeczko.paymentservice.infrastructure.persistence.entity.OutboxEven
 import com.rzodeczko.paymentservice.infrastructure.persistence.mapper.OutboxEventMapper;
 import com.rzodeczko.paymentservice.infrastructure.persistence.repository.JpaOutboxEventRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +63,28 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
     public List<OutboxEvent> findAllPending() {
         return jpaOutboxEventRepository
                 .findAllByStatus(OutboxEventStatus.PENDING.name())
+                .stream()
+                .map(outboxEventMapper::toDomain)
+                .toList();
+    }
+
+    /**
+     * Retrieves at most {@code limit} pending outbox events ordered by creation time.
+     *
+     * <p>The oldest events are returned first ({@code createdAt} ascending) to preserve
+     * FIFO-like processing semantics in the outbox dispatcher.</p>
+     *
+     * @param limit maximum number of pending events to fetch
+     * @return pending outbox events mapped to the domain model
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<OutboxEvent> findPending(int limit) {
+        PageRequest pageRequest = PageRequest.of(
+                0,
+                limit,
+                Sort.by("createdAt").ascending());
+        return jpaOutboxEventRepository.findByStatus(OutboxEventStatus.PENDING.name(), pageRequest)
                 .stream()
                 .map(outboxEventMapper::toDomain)
                 .toList();
