@@ -36,6 +36,9 @@ spring:
       # Recycle connections periodically to avoid long-lived stale sessions and improve failover behavior.
       # Keep this lower than DB-side idle/session timeouts.
       max-lifetime: 1800000
+  sql:
+    init:
+      mode: always
 
 tpay:
   api:
