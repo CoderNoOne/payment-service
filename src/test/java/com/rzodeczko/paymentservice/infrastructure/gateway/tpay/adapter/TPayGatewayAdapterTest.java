@@ -21,6 +21,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -255,6 +258,52 @@ class TPayGatewayAdapterTest {
     }
 
     @Test
+    void verifyTransactionConfirmed_shouldUseSecondCheckInsideLock_whenConcurrentThreadsRequestToken() throws Exception {
+        // given
+        TestContext context = createContext();
+        CountDownLatch start = new CountDownLatch(1);
+        AtomicBoolean firstResult = new AtomicBoolean(false);
+        AtomicBoolean secondResult = new AtomicBoolean(false);
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/oauth/auth"))
+                .andRespond(request -> {
+                    try {
+                        Thread.sleep(150);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Interrupted while preparing OAuth response", e);
+                    }
+                    return withSuccess("{\"access_token\":\"token-race\"}", MediaType.APPLICATION_JSON).createResponse(request);
+                });
+
+        context.server.expect(ExpectedCount.times(2), requestTo(BASE_URL + "/transactions/tx-race"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer token-race"))
+                .andRespond(withSuccess("{\"status\":\"success\"}", MediaType.APPLICATION_JSON));
+
+        Thread first = new Thread(() -> {
+            await(start);
+            firstResult.set(context.adapter.verifyTransactionConfirmed("tx-race"));
+        });
+        Thread second = new Thread(() -> {
+            await(start);
+            secondResult.set(context.adapter.verifyTransactionConfirmed("tx-race"));
+        });
+
+        // when
+        first.start();
+        second.start();
+        start.countDown();
+        first.join(TimeUnit.SECONDS.toMillis(2));
+        second.join(TimeUnit.SECONDS.toMillis(2));
+
+        // then
+        assertThat(firstResult.get()).isTrue();
+        assertThat(secondResult.get()).isTrue();
+        context.server.verify();
+    }
+
+    @Test
     void verifyTransactionConfirmed_shouldThrowIllegalStateException_whenOAuthResponseHasNoToken() {
         // given
         TestContext context = createContext();
@@ -402,6 +451,15 @@ class TPayGatewayAdapterTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting to start concurrent test", e);
+        }
     }
 
     private record TestContext(TPayGatewayAdapter adapter, MockRestServiceServer server) {

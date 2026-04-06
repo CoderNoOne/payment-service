@@ -9,6 +9,13 @@ import static org.mockito.Mockito.mockStatic;
 class PaymentServiceApplicationTest {
 
     @Test
+    void constructor_shouldBeCallable() {
+        PaymentServiceApplication application = new PaymentServiceApplication();
+
+        org.assertj.core.api.Assertions.assertThat(application).isNotNull();
+    }
+
+    @Test
     void main_shouldDelegateToSpringApplicationRun() {
         try (MockedStatic<SpringApplication> springApplication = mockStatic(SpringApplication.class)) {
             PaymentServiceApplication.main();
