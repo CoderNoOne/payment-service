@@ -4,6 +4,7 @@ import com.rzodeczko.paymentservice.application.port.input.NotificationCommand;
 import com.rzodeczko.paymentservice.application.port.output.GatewayResult;
 import com.rzodeczko.paymentservice.infrastructure.configuration.properties.TPayProperties;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -23,6 +24,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mockStatic;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -133,6 +135,26 @@ class TPayGatewayAdapterTest {
 
         // when
         boolean confirmed = context.adapter.verifyTransactionConfirmed("tx-101");
+
+        // then
+        assertThat(confirmed).isFalse();
+        context.server.verify();
+    }
+
+    @Test
+    void verifyTransactionConfirmed_shouldReturnFalse_whenGatewayReturnsNullPayload() {
+        // given
+        TestContext context = createContext();
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/oauth/auth"))
+                .andRespond(withSuccess("{\"access_token\":\"token-1\"}", MediaType.APPLICATION_JSON));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-null-response"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("null", MediaType.APPLICATION_JSON));
+
+        // when
+        boolean confirmed = context.adapter.verifyTransactionConfirmed("tx-null-response");
 
         // then
         assertThat(confirmed).isFalse();
@@ -319,6 +341,37 @@ class TPayGatewayAdapterTest {
 
         // then
         assertThat(valid).isFalse();
+    }
+
+    @Test
+    void verifyNotificationSignature_shouldThrowIllegalStateException_whenMd5AlgorithmIsUnavailable() throws Exception {
+        // given
+        TPayProperties properties = tPayProperties();
+        TPayGatewayAdapter adapter = new TPayGatewayAdapter(properties, RestClient.builder());
+
+        NotificationCommand command = new NotificationCommand(
+                "merchant-1",
+                "tr-1",
+                "2026-04-05T12:00:00Z",
+                "crc-1",
+                "10.00",
+                "10.00",
+                "ORDER",
+                "TRUE",
+                "",
+                "john@doe.com",
+                "any-md5"
+        );
+
+        try (MockedStatic<MessageDigest> messageDigest = mockStatic(MessageDigest.class)) {
+            messageDigest.when(() -> MessageDigest.getInstance("MD5"))
+                    .thenThrow(new NoSuchAlgorithmException("MD5 unavailable"));
+
+            // when / then
+            assertThatThrownBy(() -> adapter.verifyNotificationSignature(command))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("MD5 algorithm not available");
+        }
     }
 
     private TestContext createContext() {
