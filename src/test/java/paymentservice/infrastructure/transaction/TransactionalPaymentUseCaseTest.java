@@ -120,9 +120,9 @@ class TransactionalPaymentUseCaseTest {
     @Test
     void handleNotification_shouldReturnImmediately_whenPaymentAlreadyPaid() {
         NotificationCommand notification = notification("tr-1", "TRUE");
-        Payment paid = buildPayment(UUID.randomUUID(), PaymentStatus.PAID, "tr-1", "https://gateway.com/pay");
+        Payment paid = buildPayment(UUID.randomUUID(), PaymentStatus.PAID, "crc", "https://gateway.com/pay");
         when(paymentGatewayPort.verifyNotificationSignature(notification)).thenReturn(true);
-        when(paymentTransactionBoundary.getPaymentByExternalId("tr-1")).thenReturn(paid);
+        when(paymentTransactionBoundary.getPaymentByExternalId("crc")).thenReturn(paid);
 
         paymentUseCase.handleNotification(notification);
 
@@ -134,9 +134,9 @@ class TransactionalPaymentUseCaseTest {
     @Test
     void handleNotification_shouldConfirmPayment_whenStatusTrueAndConfirmed() {
         NotificationCommand notification = notification("tr-1", "TRUE");
-        Payment pending = buildPayment(UUID.randomUUID(), PaymentStatus.PENDING, "tr-1", "https://gateway.com/pay");
+        Payment pending = buildPayment(UUID.randomUUID(), PaymentStatus.PENDING, "crc", "https://gateway.com/pay");
         when(paymentGatewayPort.verifyNotificationSignature(notification)).thenReturn(true);
-        when(paymentTransactionBoundary.getPaymentByExternalId("tr-1")).thenReturn(pending);
+        when(paymentTransactionBoundary.getPaymentByExternalId("crc")).thenReturn(pending);
         when(paymentGatewayPort.verifyTransactionConfirmed("tr-1")).thenReturn(true);
 
         paymentUseCase.handleNotification(notification);
@@ -148,9 +148,9 @@ class TransactionalPaymentUseCaseTest {
     @Test
     void handleNotification_shouldDoNothing_whenStatusTrueButNotConfirmed() {
         NotificationCommand notification = notification("tr-1", "TRUE");
-        Payment pending = buildPayment(UUID.randomUUID(), PaymentStatus.PENDING, "tr-1", "https://gateway.com/pay");
+        Payment pending = buildPayment(UUID.randomUUID(), PaymentStatus.PENDING, "crc", "https://gateway.com/pay");
         when(paymentGatewayPort.verifyNotificationSignature(notification)).thenReturn(true);
-        when(paymentTransactionBoundary.getPaymentByExternalId("tr-1")).thenReturn(pending);
+        when(paymentTransactionBoundary.getPaymentByExternalId("crc")).thenReturn(pending);
         when(paymentGatewayPort.verifyTransactionConfirmed("tr-1")).thenReturn(false);
 
         paymentUseCase.handleNotification(notification);
@@ -162,9 +162,9 @@ class TransactionalPaymentUseCaseTest {
     @Test
     void handleNotification_shouldFailPayment_whenStatusIsNotTrue() {
         NotificationCommand notification = notification("tr-1", "FALSE");
-        Payment pending = buildPayment(UUID.randomUUID(), PaymentStatus.PENDING, "tr-1", "https://gateway.com/pay");
+        Payment pending = buildPayment(UUID.randomUUID(), PaymentStatus.PENDING, "crc", "https://gateway.com/pay");
         when(paymentGatewayPort.verifyNotificationSignature(notification)).thenReturn(true);
-        when(paymentTransactionBoundary.getPaymentByExternalId("tr-1")).thenReturn(pending);
+        when(paymentTransactionBoundary.getPaymentByExternalId("crc")).thenReturn(pending);
 
         paymentUseCase.handleNotification(notification);
 

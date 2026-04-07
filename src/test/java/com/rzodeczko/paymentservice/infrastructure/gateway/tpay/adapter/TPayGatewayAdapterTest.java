@@ -60,7 +60,7 @@ class TPayGatewayAdapterTest {
 
         // then
         assertThat(result.redirectUrl()).isEqualTo("https://pay.tpay.test/redirect");
-        assertThat(result.externalTransactionId()).isEqualTo("tx-123");
+        assertThat(result.externalTransactionId()).isEqualTo(orderId.toString());
         context.server.verify();
     }
 
@@ -114,7 +114,7 @@ class TPayGatewayAdapterTest {
 
         context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-100"))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"status\":\"success\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"status\":\"correct\"}", MediaType.APPLICATION_JSON));
 
         // when
         boolean confirmed = context.adapter.verifyTransactionConfirmed("tx-100");
@@ -215,7 +215,7 @@ class TPayGatewayAdapterTest {
         context.server.expect(ExpectedCount.times(2), requestTo(BASE_URL + "/transactions/tx-cached"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer token-cached"))
-                .andRespond(withSuccess("{\"status\":\"success\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"status\":\"correct\"}", MediaType.APPLICATION_JSON));
 
         // when
         boolean first = context.adapter.verifyTransactionConfirmed("tx-cached");
@@ -237,14 +237,14 @@ class TPayGatewayAdapterTest {
         context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-1"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer token-1"))
-                .andRespond(withSuccess("{\"status\":\"success\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"status\":\"correct\"}", MediaType.APPLICATION_JSON));
 
         context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/oauth/auth"))
                 .andRespond(withSuccess("{\"access_token\":\"token-2\"}", MediaType.APPLICATION_JSON));
         context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-2"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer token-2"))
-                .andRespond(withSuccess("{\"status\":\"success\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"status\":\"correct\"}", MediaType.APPLICATION_JSON));
 
         // when
         boolean first = context.adapter.verifyTransactionConfirmed("tx-1");
@@ -279,7 +279,7 @@ class TPayGatewayAdapterTest {
         context.server.expect(ExpectedCount.times(2), requestTo(BASE_URL + "/transactions/tx-race"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer token-race"))
-                .andRespond(withSuccess("{\"status\":\"success\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"status\":\"correct\"}", MediaType.APPLICATION_JSON));
 
         Thread first = new Thread(() -> {
             await(start);
