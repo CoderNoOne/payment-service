@@ -9,7 +9,7 @@ import com.rzodeczko.paymentservice.domain.exception.PaymentAlreadyExistsExcepti
 import com.rzodeczko.paymentservice.domain.model.Payment;
 import com.rzodeczko.paymentservice.domain.model.PaymentStatus;
 import com.rzodeczko.paymentservice.infrastructure.transaction.PaymentTransactionBoundary;
-import com.rzodeczko.paymentservice.infrastructure.transaction.PaymentUseCaseImpl;
+import com.rzodeczko.paymentservice.infrastructure.usecase.PaymentUseCaseImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

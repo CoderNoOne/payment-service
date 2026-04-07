@@ -1,4 +1,4 @@
-package com.rzodeczko.paymentservice.infrastructure.transaction;
+package com.rzodeczko.paymentservice.infrastructure.usecase;
 
 import com.rzodeczko.paymentservice.application.port.input.InitPaymentResult;
 import com.rzodeczko.paymentservice.application.port.input.NotificationCommand;
@@ -8,6 +8,7 @@ import com.rzodeczko.paymentservice.application.port.output.PaymentGatewayPort;
 import com.rzodeczko.paymentservice.domain.exception.InvalidNotificationSignatureException;
 import com.rzodeczko.paymentservice.domain.exception.PaymentAlreadyExistsException;
 import com.rzodeczko.paymentservice.domain.model.Payment;
+import com.rzodeczko.paymentservice.infrastructure.transaction.PaymentTransactionBoundary;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
