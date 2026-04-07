@@ -209,5 +209,5 @@ Coverage report will be generated at `target/site/jacoco/index.html`.
 ```
 
 ## 🤝 Contact
-Designed and implemented by **Rzodeczko**.
+Designed and implemented by **Michał Rzodeczko**.
 Feel free to check out my other projects on [GitHub](https://github.com/CoderNoOne).
