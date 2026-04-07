@@ -8,6 +8,14 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/**
+ * Request payload used to initialize a payment.
+ *
+ * @param orderId unique identifier of the order
+ * @param amount requested payment amount
+ * @param email customer email address
+ * @param name customer full name
+ */
 public record InitPaymentRequestDto(
         @NotNull(message = "orderId cannot be null")
         UUID orderId,
