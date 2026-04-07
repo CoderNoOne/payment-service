@@ -109,7 +109,6 @@ Planned iterations for system evolution include:
 * **Event-Driven Outbox:** Transitioning from polling (`OutboxProcessor`) to a message broker (Kafka/RabbitMQ) for lower latency event dispatch.
 * **OpenAPI/Swagger UI:** Interactive API documentation and contract-first development.
 * **Kubernetes Manifests:** Production-grade K8s Deployments, Services, ConfigMaps, and Secrets.
-* **Idempotency Keys:** API-level idempotency to prevent duplicate payment charges on retried requests.
 
 ## 🚀 Getting Started (Local Environment)
 
