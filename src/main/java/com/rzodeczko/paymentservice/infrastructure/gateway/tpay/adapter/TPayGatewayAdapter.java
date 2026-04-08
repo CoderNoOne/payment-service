@@ -174,6 +174,10 @@ public class TPayGatewayAdapter implements PaymentGatewayPort {
     public boolean verifyNotificationSignature(NotificationCommand n) {
         String dataToHash = n.merchantId() + n.trId() + n.trAmount() + n.trCrc() + tPayProperties.api().securityCode();
         String calculated = md5Hex(dataToHash);
+        log.warn("Signature debug | merchantId=[{}] trId=[{}] trAmount=[{}] trCrc=[{}] | dataToHash=[{}{}...] | calculated=[{}] | received=[{}]",
+                n.merchantId(), n.trId(), n.trAmount(), n.trCrc(),
+                n.merchantId() + n.trId() + n.trAmount() + n.trCrc(), tPayProperties.api().securityCode(),
+                calculated, n.md5Sum());
         return calculated.equalsIgnoreCase(n.md5Sum());
     }
 
