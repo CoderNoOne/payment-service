@@ -1,0 +1,353 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  version: 1.0.0
+  description: |
+    OpenAPI specification generated from current Spring controllers and DTO contracts.
+    Covers payment initialization, TPay notification callback handling, callback pages,
+    and the root health-check endpoint.
+servers:
+  - url: http://localhost:{{ PAYMENT_SERVICE_PORT }}
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health endpoints
+  - name: Payments
+    description: Payment flow endpoints
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Service health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              examples:
+                ok:
+                  value:
+                    message: PAYMENT SERVICE OK
+
+  /payments/init:
+    post:
+      tags: [Payments]
+      summary: Initialize payment
+      operationId: initPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitPaymentRequest'
+            examples:
+              sample:
+                value:
+                  orderId: 11111111-1111-1111-1111-111111111111
+                  amount: 129.99
+                  email: customer@example.com
+                  name: John Doe
+      responses:
+        '200':
+          description: Payment initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitPaymentResponse'
+              examples:
+                success:
+                  value:
+                    paymentId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    redirectUrl: https://pay.tpay.com/redirect/tx-123
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /payments/notification:
+    post:
+      tags: [Payments]
+      summary: Handle TPay webhook notification
+      description: |
+        Receives asynchronous callback payload from TPay.
+        Controller consumes `application/x-www-form-urlencoded` and returns `{ "result": "TRUE|FALSE" }`.
+      operationId: handleNotification
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationFormRequest'
+            examples:
+              callback:
+                value:
+                  id: '1010'
+                  tr_id: TR-123
+                  tr_date: '2026-04-08 12:30:00'
+                  tr_crc: 11111111-1111-1111-1111-111111111111
+                  tr_amount: '129.99'
+                  tr_paid: '129.99'
+                  tr_status: 'TRUE'
+                  tr_email: customer@example.com
+                  tr_error: none
+                  tr_desc: Order 11111111-1111-1111-1111-111111111111
+                  md5sum: REPLACE_WITH_VALID_MD5
+      responses:
+        '200':
+          description: Notification processed correctly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+              examples:
+                accepted:
+                  value:
+                    result: 'TRUE'
+        '400':
+          description: Notification rejected (invalid payload/signature)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+              examples:
+                rejected:
+                  value:
+                    result: 'FALSE'
+        '500':
+          description: Temporary processing failure, TPay should retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+              examples:
+                retry:
+                  value:
+                    result: 'FALSE'
+
+  /payments/success:
+    get:
+      tags: [Payments]
+      summary: Payment success callback
+      operationId: paymentSuccess
+      responses:
+        '200':
+          description: Success page payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                ok:
+                  value:
+                    message: PAYMENT OK
+
+  /payments/error:
+    get:
+      tags: [Payments]
+      summary: Payment error callback
+      operationId: paymentError
+      responses:
+        '200':
+          description: Error page payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                error:
+                  value:
+                    message: PAYMENT ERROR
+
+components:
+  responses:
+    BadRequestError:
+      description: Request validation/domain error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation:
+              value:
+                status: 400
+                error: Validation failed
+                message: 'amount: amount must be greater than 0'
+                timestamp: '2026-04-08T10:00:00Z'
+    ConflictError:
+      description: Business conflict (e.g., payment already exists)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            conflict:
+              value:
+                status: 409
+                error: Conflict
+                message: Payment already exists for given orderId
+                timestamp: '2026-04-08T10:00:00Z'
+    InternalServerError:
+      description: Integration/unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internal:
+              value:
+                status: 500
+                error: Internal Server Error
+                message: Unexpected error
+                timestamp: '2026-04-08T10:00:00Z'
+
+  schemas:
+    InitPaymentRequest:
+      type: object
+      required:
+        - orderId
+        - amount
+        - email
+        - name
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: Unique order identifier
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          description: Payment amount
+          example: 129.99
+        email:
+          type: string
+          format: email
+          description: Customer email
+          example: customer@example.com
+        name:
+          type: string
+          minLength: 1
+          description: Customer full name
+          example: John Doe
+
+    InitPaymentResponse:
+      type: object
+      required:
+        - paymentId
+        - redirectUrl
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        redirectUrl:
+          type: string
+          format: uri
+
+    NotificationFormRequest:
+      type: object
+      required:
+        - id
+        - tr_id
+        - tr_date
+        - tr_crc
+        - tr_amount
+        - tr_paid
+        - tr_status
+        - tr_email
+        - tr_error
+        - tr_desc
+        - md5sum
+      properties:
+        id:
+          type: string
+          description: TPay merchant identifier
+        tr_id:
+          type: string
+          description: TPay transaction identifier
+        tr_date:
+          type: string
+          description: Transaction date from TPay
+        tr_crc:
+          type: string
+          description: Correlation value (order identifier passed to gateway)
+        tr_amount:
+          type: string
+          description: Transaction amount reported by TPay
+        tr_paid:
+          type: string
+          description: Paid amount reported by TPay
+        tr_status:
+          type: string
+          description: Payment status flag
+          enum: ['TRUE', 'FALSE']
+        tr_email:
+          type: string
+          format: email
+          description: Customer email from gateway callback
+        tr_error:
+          type: string
+          description: TPay error code/info
+        tr_desc:
+          type: string
+          description: Transaction description
+        md5sum:
+          type: string
+          description: Callback signature
+
+    NotificationResponse:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: string
+          enum: ['TRUE', 'FALSE']
+
+    PaymentResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: PAYMENT OK
+
+    HealthCheckResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: PAYMENT SERVICE OK
+
+    ErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+        - message
+        - timestamp
+      properties:
+        status:
+          type: integer
+          format: int32
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: 'orderId: orderId cannot be null'
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-04-08T10:00:00Z'
+
+
+
+

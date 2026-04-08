@@ -13,6 +13,7 @@
 - [🔄 How It Works (End-to-End Payment Flow)](#how-it-works)
 - [🌐 API Endpoints (Quick Reference)](#api-endpoints)
 - [🚀 Getting Started (Local Environment)](#getting-started)
+  - [<img src="https://cdn.simpleicons.org/swagger/85EA2D" alt="Swagger" height="14" /> Swagger UI (Local OpenAPI Preview)](#swagger-ui-local)
 - [⚙️ Environment Variables](#environment-variables)
 - [🛠️ Common Issues / Troubleshooting](#common-issues)
 - [🏗️ Architecture](#architecture)
@@ -192,6 +193,8 @@ PAYMENT_SERVICE_TPAY_API_SECURITY_CODE=your_security_code
 PAYMENT_SERVICE_TPAY_APP_NOTIFICATION_URL=https://yourdomain.com/api/payments/notifications
 PAYMENT_SERVICE_TPAY_APP_RETURN_SUCCESS_URL=https://yourdomain.com/payment/success
 PAYMENT_SERVICE_TPAY_APP_RETURN_ERROR_URL=https://yourdomain.com/payment/error
+# Swagger UI
+SWAGGER_UI_PORT=your_preferred_port
 ```
 
 > **🌍 Public URL for TPay callbacks:** TPay webhook notifications must reach your app from the internet, so your local service needs a public HTTPS address.
@@ -221,7 +224,23 @@ docker-compose up -d --build
 * Health Check: `http://localhost:8081/actuator/health`
 * MySQL: `localhost:3306` (via configured port)
 
-### 4. Running Tests Locally
+<a id="swagger-ui-local"></a>
+### 4. Swagger UI (Local OpenAPI Preview)
+
+The repository includes `openapi.template.yaml`. The Swagger UI container renders runtime `openapi.yaml` from this template using `.env`.
+
+```powershell
+docker compose --profile docs up -d swagger-ui-payment
+```
+
+Then open:
+
+- `http://localhost:{SWAGGER_UI_PORT}` to access the interactive API documentation
+
+> Note: `PAYMENT_SERVICE_OPENAPI_BASE_URL` from `.env` is passed to the Swagger container and injected into `servers[0].url` at runtime.
+> Swagger UI port is controlled by `.env` via `SWAGGER_UI_PORT`.
+
+### 5. Running Tests Locally
 
 ```bash
 mvn verify
@@ -257,6 +276,8 @@ The project reads values from `.env` (used by Docker Compose). Below is a practi
 |---|---|---|---|---|
 | `PAYMENT_SERVICE_PORT` | yes | HTTP port exposed by the payment service container. | Free TCP port. | `8081` |
 | `PAYMENT_SERVICE_APPLICATION_NAME` | optional | Spring application name (logging/metadata). | Any non-empty string. | `payment-service` |
+| `PAYMENT_SERVICE_OPENAPI_BASE_URL` | optional | Base URL injected into `openapi.template.yaml` by the Swagger UI container at runtime (`servers[0].url`). | Full HTTP/HTTPS URL. | `http://localhost:8081` |
+| `SWAGGER_UI_PORT` | optional | Host port used by Swagger UI container (compose profile `docs`). Set this to your preferred free local port. | Free TCP port. | `9000` |
 
 ### TPay
 

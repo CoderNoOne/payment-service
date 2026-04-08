@@ -51,3 +51,5 @@ tpay:
     return-success-url: ${TPAY_APP_RETURN_SUCCESS_URL}
     return-error-url: ${TPAY_APP_RETURN_ERROR_URL}
 
+swagger-ui-port: ${SWAGGER_UI_PORT}
+
