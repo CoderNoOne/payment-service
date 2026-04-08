@@ -41,7 +41,43 @@ This repository serves as a showcase of modern backend engineering practices (as
 
 This is the complete payment lifecycle from API request to downstream notification delivery:
 
-1. **Payment initiation (`POST /payments`)**  
+
+### Interaction sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant PS as Payment Service
+    participant T as TPay
+    participant DB as Database
+    participant OP as OutboxProcessor
+    participant NS as External Notification Service
+
+    C->>PS: POST /payments/init
+    PS->>T: Create transaction
+    T-->>PS: transactionId + redirectUrl
+    PS-->>C: paymentId + redirectUrl
+
+    C->>T: Redirect customer to checkout
+    T-->>PS: POST /payments/notification
+
+    PS->>PS: Verify notification signature
+    PS->>DB: Update payment state
+    PS->>DB: Save outbox event\n(same transaction)
+
+    OP->>DB: Poll pending outbox events
+    DB-->>OP: Pending events
+    OP->>NS: Send event notification
+
+    alt Delivery successful
+        OP->>DB: Mark outbox event as sent
+    else Delivery failed
+        OP->>DB: Leave event pending
+    end
+```
+
+1. **Payment initiation (`POST /payments/init`)**  
    The client sends payment data (amount, order ID, customer details) to the Payment Service. The application validates input and invokes the payment use case.
 
 2. **Create payment in TPay + redirect URL**  
