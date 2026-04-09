@@ -45,7 +45,7 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
                     existing.setStatus(event.getStatus().name());
                     existing.setRetryCount(event.getRetryCount());
                     existing.setProcessedAt(event.getProcessedAt());
-                    return existing;
+                    return jpaOutboxEventRepository.saveAndFlush(existing);
                 })
                 .orElseGet(() -> {
                     OutboxEventEntity newEntity = outboxEventMapper.toEntity(event);

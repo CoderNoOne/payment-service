@@ -30,6 +30,7 @@
         <java.version>25</java.version>
         <shedlock.version>6.0.2</shedlock.version>
         <jacoco.version>0.8.14</jacoco.version>
+        <resilience4j.version>2.2.0</resilience4j.version>
     </properties>
     <dependencies>
         <dependency>
@@ -70,6 +71,15 @@
         </dependency>
 
         <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot4</artifactId>
+            <version>2.3.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-spring</artifactId>
             <version>${shedlock.version}</version>
@@ -94,6 +104,21 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+
+    <repositories>
+        <!--
+        Sonatype is used for now for resilience4j snapshot until spring boot 4 support is officially released.
+        Once there is spring boot 4 support released, this snapshot repo can be removed.
+        -->
+        <repository>
+            <id>sonatype-snapshots</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>

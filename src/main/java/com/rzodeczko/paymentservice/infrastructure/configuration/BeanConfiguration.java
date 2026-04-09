@@ -26,7 +26,7 @@ import java.util.concurrent.Executors;
  * scheduler locking. Configuration properties for TPay integration are enabled here as well.</p>
  */
 @Configuration
-@EnableConfigurationProperties({TPayProperties.class})
+@EnableConfigurationProperties(TPayProperties.class)
 @EnableScheduling
 @EnableSchedulerLock(defaultLockAtMostFor = "10m")
 public class BeanConfiguration {
@@ -69,7 +69,6 @@ public class BeanConfiguration {
 
         return builder -> builder.requestFactory(requestFactory);
     }
-
 
     @Bean
     public PaymentService paymentService(

@@ -51,5 +51,42 @@ tpay:
     return-success-url: ${TPAY_APP_RETURN_SUCCESS_URL}
     return-error-url: ${TPAY_APP_RETURN_ERROR_URL}
 
-swagger-ui-port: ${SWAGGER_UI_PORT}
+resilience4j:
+  retry:
+    instances:
+      tpay-access-token:
+        max-attempts: 2
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.rzodeczko.paymentservice.infrastructure.gateway.tpay.adapter.TPayTemporaryUnavailableException
+        ignore-exceptions:
+          - java.lang.IllegalStateException
+      tpay-verification:
+        max-attempts: 2
+        wait-duration: 300ms
+        retry-exceptions:
+          - com.rzodeczko.paymentservice.infrastructure.gateway.tpay.adapter.TPayTemporaryUnavailableException
+        ignore-exceptions:
+          - java.lang.IllegalStateException
+  circuitbreaker:
+    instances:
+      tpay-access-token:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 20s
+        record-exceptions:
+          - com.rzodeczko.paymentservice.infrastructure.gateway.tpay.adapter.TPayTemporaryUnavailableException
+        ignore-exceptions:
+          - java.lang.IllegalStateException
+      tpay-verification:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 20s
+        record-exceptions:
+          - com.rzodeczko.paymentservice.infrastructure.gateway.tpay.adapter.TPayTemporaryUnavailableException
+        ignore-exceptions:
+          - java.lang.IllegalStateException
 
+swagger-ui-port: ${SWAGGER_UI_PORT}

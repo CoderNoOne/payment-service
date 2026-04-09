@@ -2,6 +2,7 @@
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
+[![Resilience4j](https://img.shields.io/badge/Resilience4j-2.2.0-informational.svg)](https://resilience4j.readme.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![codecov](https://codecov.io/gh/CoderNoOne/payment-service/branch/master/graph/badge.svg)](https://codecov.io/gh/CoderNoOne/payment-service)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -395,6 +396,7 @@ graph TD
 * **Transactional Outbox Pattern:** Payment state changes and outbox events are persisted in a single database transaction, guaranteeing eventual consistency and eliminating the dual-write problem. The `OutboxProcessor` polls and dispatches pending events reliably.
 * **Distributed Lock with ShedLock:** The `OutboxProcessor` uses ShedLock (JDBC-backed) to ensure that only one instance processes outbox events at a time — critical for horizontal scaling without duplicate event delivery.
 * **Virtual Threads (Project Loom):** Spring Boot is configured with `spring.threads.virtual.enabled=true`, leveraging Java 25 virtual threads to maximize throughput on I/O-bound payment gateway calls without the overhead of platform thread pools.
+* **Resilience4j — Retry & Circuit Breaker on TPay calls:** All outbound TPay API calls (OAuth token fetch and transaction verification) are protected by Resilience4j policies defined in `TPayResilienceOperations`. Each operation has a dedicated **Retry** instance (max 2 attempts, 200–300 ms back-off) and a **Circuit Breaker** instance (sliding window of 10 calls, minimum 5 calls required, opens at ≥ 50 % failure rate, stays open for 20 s). Only `TPayTemporaryUnavailableException` (thrown on 5xx / network errors) triggers retries and records failures; `IllegalStateException` (permanent errors) is ignored by both policies. When the circuit is open, a fallback method converts `CallNotPermittedException` into a clear `IllegalStateException`, making the failure visible to the caller without silent data loss.
 * **Secure Notification Verification:** Incoming TPay webhook notifications are validated using cryptographic signature verification (`commons-codec`), protecting against spoofed payment callbacks.
 * **Optimized Docker Build:** Multi-stage Dockerfile with Maven dependency caching and Spring Boot layered JAR extraction, resulting in fast rebuilds and minimal runtime image size.
 
@@ -403,18 +405,19 @@ graph TD
 
 [Back to Table of Contents](#toc)
 
-| Layer              | Technology                                                   |
-|--------------------|--------------------------------------------------------------|
-| **Language**       | Java 25                                                      |
+| Layer              | Technology                                                           |
+|--------------------|----------------------------------------------------------------------|
+| **Language**       | Java 25                                                              |
 | **Framework**      | Spring Boot 4.0.5, Spring Data JPA, Spring WebMVC, Spring Validation |
-| **Database**       | MySQL 9.6.0 (HikariCP connection pool)                      |
-| **Payment Gateway**| TPay API (OAuth2 + REST)                                     |
-| **Scheduling**     | ShedLock 6.0.2 (JDBC provider)                              |
-| **Build Tool**     | Maven 3.9, JaCoCo 0.8.14                                    |
-| **Containerization**| Docker (multi-stage build), Docker Compose                  |
-| **CI/CD**          | GitHub Actions, Codecov                                      |
-| **Observability**  | Spring Boot Actuator                                         |
-| **Other**          | Lombok, Commons Codec, Spring RestClient                     |
+| **Database**       | MySQL 9.6.0 (HikariCP connection pool)                               |
+| **Payment Gateway**| TPay API (OAuth2 + REST)                                             |
+| **Scheduling**     | ShedLock 6.0.2 (JDBC provider)                                       |
+| **Resilience**     | Resilience4j 2.2.0 (Retry + CircuitBreaker)                          |
+| **Build Tool**     | Maven 3.9, JaCoCo 0.8.14                                             |
+| **Containerization**| Docker (multi-stage build), Docker Compose                           |
+| **CI/CD**          | GitHub Actions, Codecov                                              |
+| **Observability**  | Spring Boot Actuator                                                 |
+| **Other**          | Lombok, Commons Codec, Spring RestClient                             |
 
 <a id="testing-strategy"></a>
 ## 🧪 Testing Strategy & Quality Assurance

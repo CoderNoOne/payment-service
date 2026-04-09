@@ -3,6 +3,10 @@ package com.rzodeczko.paymentservice.infrastructure.gateway.tpay.adapter;
 import com.rzodeczko.paymentservice.application.port.input.NotificationCommand;
 import com.rzodeczko.paymentservice.application.port.output.GatewayResult;
 import com.rzodeczko.paymentservice.infrastructure.configuration.properties.TPayProperties;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.http.HttpMethod;
@@ -18,6 +22,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
@@ -27,10 +32,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -125,6 +132,30 @@ class TPayGatewayAdapterTest {
     }
 
     @Test
+    void verifyTransactionConfirmed_shouldRetryOnce_whenGatewayTemporaryFailsAndThenSucceeds() {
+        // given
+        TestContext context = createContext(resilientOperations(2, 2, 5, 5));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/oauth/auth"))
+                .andRespond(withSuccess("{\"access_token\":\"token-1\"}", MediaType.APPLICATION_JSON));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-retry"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-retry"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"status\":\"correct\"}", MediaType.APPLICATION_JSON));
+
+        // when
+        boolean confirmed = context.adapter.verifyTransactionConfirmed("tx-retry");
+
+        // then
+        assertThat(confirmed).isTrue();
+        context.server.verify();
+    }
+
+    @Test
     void verifyTransactionConfirmed_shouldReturnFalse_whenGatewayStatusIsNotSuccess() {
         // given
         TestContext context = createContext();
@@ -165,7 +196,7 @@ class TPayGatewayAdapterTest {
     }
 
     @Test
-    void verifyTransactionConfirmed_shouldReturnFalse_whenGatewayCallFailsWithNetworkException() {
+    void verifyTransactionConfirmed_shouldThrowIllegalStateException_whenGatewayCallFailsWithNetworkException() {
         // given
         TestContext context = createContext();
 
@@ -177,11 +208,11 @@ class TPayGatewayAdapterTest {
                     throw new IOException("Connection reset");
                 });
 
-        // when
-        boolean confirmed = context.adapter.verifyTransactionConfirmed("tx-200");
+        // when / then
+        assertThatThrownBy(() -> context.adapter.verifyTransactionConfirmed("tx-200"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TPay verification unavailable");
 
-        // then
-        assertThat(confirmed).isFalse();
         context.server.verify();
     }
 
@@ -198,6 +229,38 @@ class TPayGatewayAdapterTest {
 
         // when / then
         assertThatThrownBy(() -> context.adapter.verifyTransactionConfirmed("tx-500"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TPay verification unavailable");
+
+        context.server.verify();
+    }
+
+    @Test
+    void verifyTransactionConfirmed_shouldOpenCircuitBreaker_afterRepeatedTemporaryFailures() {
+        // given
+        TestContext context = createContext(resilientOperations(1, 1, 2, 2));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/oauth/auth"))
+                .andRespond(withSuccess("{\"access_token\":\"token-cb\"}", MediaType.APPLICATION_JSON));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-open"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions/tx-open"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        // when / then
+        assertThatThrownBy(() -> context.adapter.verifyTransactionConfirmed("tx-open"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TPay verification unavailable");
+
+        assertThatThrownBy(() -> context.adapter.verifyTransactionConfirmed("tx-open"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("TPay verification unavailable");
+
+        assertThatThrownBy(() -> context.adapter.verifyTransactionConfirmed("tx-open"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("TPay verification unavailable");
 
@@ -320,6 +383,30 @@ class TPayGatewayAdapterTest {
     }
 
     @Test
+    void registerTransaction_shouldRetryTokenFetchButNotRetryTransactionRegistration() {
+        // given
+        TestContext context = createContext(resilientOperations(2, 1, 5, 5));
+        UUID orderId = UUID.randomUUID();
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/oauth/auth"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/oauth/auth"))
+                .andRespond(withSuccess("{\"access_token\":\"token-after-retry\"}", MediaType.APPLICATION_JSON));
+
+        context.server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/transactions"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer token-after-retry"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        // when / then
+        assertThatThrownBy(() -> context.adapter.registerTransaction(orderId, new BigDecimal("10.00"), "john@doe.com", "John Doe"))
+                .isInstanceOf(Exception.class);
+
+        context.server.verify();
+    }
+
+    @Test
     void verifyTransactionConfirmed_shouldThrowIllegalStateException_whenOAuthResponseIsNull() {
         // given
         TestContext context = createContext();
@@ -339,7 +426,7 @@ class TPayGatewayAdapterTest {
     void verifyNotificationSignature_shouldReturnTrue_whenMd5MatchesIgnoringCase() {
         // given
         TPayProperties properties = tPayProperties();
-        TPayGatewayAdapter adapter = new TPayGatewayAdapter(properties, RestClient.builder());
+        TPayGatewayAdapter adapter = new TPayGatewayAdapter(properties, RestClient.builder(), new TPayResilienceOperations());
 
         String payloadToHash = "merchant-1" + "tr-1" + "10.00" + "crc-1" + properties.api().securityCode();
         String expectedMd5Uppercase = md5HexUppercase(payloadToHash);
@@ -369,7 +456,7 @@ class TPayGatewayAdapterTest {
     void verifyNotificationSignature_shouldReturnFalse_whenMd5DoesNotMatch() {
         // given
         TPayProperties properties = tPayProperties();
-        TPayGatewayAdapter adapter = new TPayGatewayAdapter(properties, RestClient.builder());
+        TPayGatewayAdapter adapter = new TPayGatewayAdapter(properties, RestClient.builder(), new TPayResilienceOperations());
 
         NotificationCommand command = new NotificationCommand(
                 "merchant-1",
@@ -396,7 +483,7 @@ class TPayGatewayAdapterTest {
     void verifyNotificationSignature_shouldThrowIllegalStateException_whenMd5AlgorithmIsUnavailable() throws Exception {
         // given
         TPayProperties properties = tPayProperties();
-        TPayGatewayAdapter adapter = new TPayGatewayAdapter(properties, RestClient.builder());
+        TPayGatewayAdapter adapter = new TPayGatewayAdapter(properties, RestClient.builder(), new TPayResilienceOperations());
 
         NotificationCommand command = new NotificationCommand(
                 "merchant-1",
@@ -424,10 +511,118 @@ class TPayGatewayAdapterTest {
     }
 
     private TestContext createContext() {
+        return createContext(testOperationsWithFallback());
+    }
+
+    /**
+     * Default test stub that simulates Spring AOP fallback behaviour without a Spring context.
+     * Wraps TPayTemporaryUnavailableException / CallNotPermittedException → IllegalStateException,
+     * matching the runtime behaviour of the @CircuitBreaker fallbackMethod.
+     */
+    private TPayResilienceOperations testOperationsWithFallback() {
+        TPayResilienceOperations operations = mock(TPayResilienceOperations.class);
+
+        when(operations.executeAccessToken(any(), anyString())).thenAnswer(invocation -> {
+            java.util.function.Supplier<?> supplier = invocation.getArgument(0);
+            String apiCallContext = invocation.getArgument(1);
+            try {
+                return supplier.get();
+            } catch (TPayTemporaryUnavailableException | io.github.resilience4j.circuitbreaker.CallNotPermittedException e) {
+                throw new IllegalStateException("TPay OAuth unavailable | " + apiCallContext, e);
+            }
+        });
+
+        when(operations.executeVerification(any(), anyString())).thenAnswer(invocation -> {
+            java.util.function.Supplier<?> supplier = invocation.getArgument(0);
+            String apiCallContext = invocation.getArgument(1);
+            try {
+                return supplier.get();
+            } catch (TPayTemporaryUnavailableException | io.github.resilience4j.circuitbreaker.CallNotPermittedException e) {
+                throw new IllegalStateException("TPay verification unavailable | " + apiCallContext, e);
+            }
+        });
+
+        return operations;
+    }
+
+    private TestContext createContext(TPayResilienceOperations resilienceOperations) {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        TPayGatewayAdapter adapter = new TPayGatewayAdapter(tPayProperties(), builder);
+        TPayGatewayAdapter adapter = new TPayGatewayAdapter(tPayProperties(), builder, resilienceOperations);
         return new TestContext(adapter, server);
+    }
+
+    private TPayResilienceOperations resilientOperations(
+            int tokenRetryMaxAttempts,
+            int verificationRetryMaxAttempts,
+            int tokenCircuitMinimumCalls,
+            int verificationCircuitMinimumCalls
+    ) {
+        Retry accessTokenRetry = Retry.of(
+                "test-token-retry",
+                RetryConfig.custom()
+                        .maxAttempts(tokenRetryMaxAttempts)
+                        .waitDuration(Duration.ZERO)
+                        .retryExceptions(TPayTemporaryUnavailableException.class)
+                        .build()
+        );
+        CircuitBreaker accessTokenCircuitBreaker = CircuitBreaker.of(
+                "test-token-circuit-breaker",
+                CircuitBreakerConfig.custom()
+                        .slidingWindowSize(Math.max(2, tokenCircuitMinimumCalls))
+                        .minimumNumberOfCalls(tokenCircuitMinimumCalls)
+                        .failureRateThreshold(50.0f)
+                        .waitDurationInOpenState(Duration.ofMinutes(1))
+                        .recordExceptions(TPayTemporaryUnavailableException.class)
+                        .build()
+        );
+
+        Retry verificationRetry = Retry.of(
+                "test-verification-retry",
+                RetryConfig.custom()
+                        .maxAttempts(verificationRetryMaxAttempts)
+                        .waitDuration(Duration.ZERO)
+                        .retryExceptions(TPayTemporaryUnavailableException.class)
+                        .build()
+        );
+        CircuitBreaker verificationCircuitBreaker = CircuitBreaker.of(
+                "test-verification-circuit-breaker",
+                CircuitBreakerConfig.custom()
+                        .slidingWindowSize(Math.max(2, verificationCircuitMinimumCalls))
+                        .minimumNumberOfCalls(verificationCircuitMinimumCalls)
+                        .failureRateThreshold(50.0f)
+                        .waitDurationInOpenState(Duration.ofMinutes(1))
+                        .recordExceptions(TPayTemporaryUnavailableException.class)
+                        .build()
+        );
+
+        TPayResilienceOperations operations = mock(TPayResilienceOperations.class);
+
+        when(operations.executeAccessToken(any(), anyString())).thenAnswer(invocation -> {
+            java.util.function.Supplier<?> supplier = invocation.getArgument(0);
+            String apiCallContext = invocation.getArgument(1);
+            try {
+                java.util.function.Supplier<?> decorated = io.github.resilience4j.circuitbreaker.CircuitBreaker
+                        .decorateSupplier(accessTokenCircuitBreaker, io.github.resilience4j.retry.Retry.decorateSupplier(accessTokenRetry, supplier));
+                return decorated.get();
+            } catch (TPayTemporaryUnavailableException | io.github.resilience4j.circuitbreaker.CallNotPermittedException e) {
+                throw new IllegalStateException("TPay OAuth unavailable | " + apiCallContext, e);
+            }
+        });
+
+        when(operations.executeVerification(any(), anyString())).thenAnswer(invocation -> {
+            java.util.function.Supplier<?> supplier = invocation.getArgument(0);
+            String apiCallContext = invocation.getArgument(1);
+            try {
+                java.util.function.Supplier<?> decorated = io.github.resilience4j.circuitbreaker.CircuitBreaker
+                        .decorateSupplier(verificationCircuitBreaker, io.github.resilience4j.retry.Retry.decorateSupplier(verificationRetry, supplier));
+                return decorated.get();
+            } catch (TPayTemporaryUnavailableException | io.github.resilience4j.circuitbreaker.CallNotPermittedException e) {
+                throw new IllegalStateException("TPay verification unavailable | " + apiCallContext, e);
+            }
+        });
+
+        return operations;
     }
 
     private TPayProperties tPayProperties() {

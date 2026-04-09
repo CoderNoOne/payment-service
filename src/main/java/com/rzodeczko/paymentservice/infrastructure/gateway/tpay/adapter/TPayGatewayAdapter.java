@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +39,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class TPayGatewayAdapter implements PaymentGatewayPort {
     private final TPayProperties tPayProperties;
     private final RestClient restClient;
+    private final TPayResilienceOperations resilienceOperations;
 
     /**
      * Cached bearer token valid for the current TTL window.
@@ -66,11 +69,16 @@ public class TPayGatewayAdapter implements PaymentGatewayPort {
      * @param tPayProperties    strongly typed TPay integration properties
      * @param restClientBuilder RestClient builder used to construct a gateway-scoped client
      */
-    public TPayGatewayAdapter(TPayProperties tPayProperties, RestClient.Builder restClientBuilder) {
+    public TPayGatewayAdapter(
+            TPayProperties tPayProperties,
+            RestClient.Builder restClientBuilder,
+            TPayResilienceOperations resilienceOperations
+    ) {
         this.tPayProperties = tPayProperties;
         this.restClient = restClientBuilder
                 .baseUrl(tPayProperties.api().url())
                 .build();
+        this.resilienceOperations = resilienceOperations;
     }
 
     /**
@@ -139,17 +147,10 @@ public class TPayGatewayAdapter implements PaymentGatewayPort {
     public boolean verifyTransactionConfirmed(String externalTransactionId) {
         String accessToken = fetchAccessToken();
         try {
-            var response = restClient
-                    .get()
-                    .uri("/transactions/" + externalTransactionId)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                        // Propagate as IllegalStateException so the controller returns 500 to TPay,
-                        // triggering a retry rather than silently losing the payment confirmation.
-                        throw new IllegalStateException("TPay verification unavailable, HTTP " + res.getStatusCode());
-                    })
-                    .body(TPayTransactionResponseDto.class);
+            var response = resilienceOperations.executeVerification(
+                    () -> requestTransactionStatus(externalTransactionId, accessToken),
+                    "operation=verification, transactionId=" + externalTransactionId
+            );
 
             return response != null && "correct".equalsIgnoreCase(response.status());
         } catch (IllegalStateException e) {
@@ -201,6 +202,7 @@ public class TPayGatewayAdapter implements PaymentGatewayPort {
      * @return valid bearer access token
      * @throws IllegalStateException when TPay returns an empty OAuth response
      */
+
     private String fetchAccessToken() {
 
         // Fast path: token is still valid — return immediately without acquiring the lock.
@@ -221,13 +223,11 @@ public class TPayGatewayAdapter implements PaymentGatewayPort {
             body.add("client_id", tPayProperties.api().clientId());
             body.add("client_secret", tPayProperties.api().clientSecret());
 
-            var response = restClient
-                    .post()
-                    .uri("/oauth/auth")
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(body)
-                    .retrieve()
-                    .body(OAuthResponseDto.class);
+            OAuthResponseDto response;
+            response = resilienceOperations.executeAccessToken(
+                    () -> requestAccessToken(body),
+                    "operation=oauth-auth, clientId=" + tPayProperties.api().clientId()
+            );
 
             if (response == null || response.accessToken() == null) {
                 throw new IllegalStateException("Failed to obtain TPay access token");
@@ -239,6 +239,50 @@ public class TPayGatewayAdapter implements PaymentGatewayPort {
             return this.cachedToken;
         } finally {
             tokenLock.unlock();
+        }
+    }
+
+    private OAuthResponseDto requestAccessToken(MultiValueMap<String, String> body) {
+        try {
+            return restClient
+                    .post()
+                    .uri("/oauth/auth")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(body)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                        throw new TPayTemporaryUnavailableException("TPay OAuth unavailable, HTTP " + res.getStatusCode());
+                    })
+                    .body(OAuthResponseDto.class);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().is5xxServerError()) {
+                throw new TPayTemporaryUnavailableException("TPay OAuth unavailable, HTTP " + e.getStatusCode(), e);
+            }
+            throw new IllegalStateException("TPay OAuth rejected request, HTTP " + e.getStatusCode(), e);
+        } catch (RestClientException e) {
+            throw new TPayTemporaryUnavailableException("TPay OAuth request failed", e);
+        }
+    }
+
+    private TPayTransactionResponseDto requestTransactionStatus(String externalTransactionId, String accessToken) {
+        try {
+            return restClient
+                    .get()
+                    .uri("/transactions/" + externalTransactionId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                        throw new TPayTemporaryUnavailableException("TPay verification unavailable, HTTP " + res.getStatusCode());
+                    })
+                    .body(TPayTransactionResponseDto.class);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().is5xxServerError()) {
+                throw new TPayTemporaryUnavailableException("TPay verification unavailable, HTTP " + e.getStatusCode(), e);
+            }
+            log.warn("TPay verification rejected. transactionId={}, status={}", externalTransactionId, e.getStatusCode());
+            return null;
+        } catch (RestClientException e) {
+            throw new TPayTemporaryUnavailableException("TPay verification request failed", e);
         }
     }
 }

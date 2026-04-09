@@ -91,7 +91,7 @@ services:
   # SWAGGER UI
   # --------------------------------------------------------------------------------------------------------------------
   swagger-ui-payment:
-    image: swaggerapi/swagger-ui:latest
+    image: swaggerapi/swagger-ui:v5.32.2
     restart: unless-stopped
     profiles:
       - docs

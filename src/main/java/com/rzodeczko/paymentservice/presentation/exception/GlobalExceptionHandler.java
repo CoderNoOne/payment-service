@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -27,9 +28,18 @@ public class GlobalExceptionHandler {
     /**
      * Handles {@link PaymentNotFoundException}.
      *
-     * @param paymentNotFoundException business exception
+     * @param noResourceFoundException business exception
      * @return HTTP 404 (Not Found) with exception details
      */
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponseDto> handle(NoResourceFoundException noResourceFoundException) {
+        log.warn("Resource not found: {}", noResourceFoundException.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponseDto(404, "Not Found", noResourceFoundException.getMessage()));
+    }
+
     @ExceptionHandler(PaymentNotFoundException.class)
     public ResponseEntity<ErrorResponseDto> handle(PaymentNotFoundException paymentNotFoundException) {
         log.warn("Payment not found: {}", paymentNotFoundException.getMessage());
