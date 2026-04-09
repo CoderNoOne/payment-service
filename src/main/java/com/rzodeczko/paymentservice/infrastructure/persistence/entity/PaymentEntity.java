@@ -2,6 +2,8 @@ package com.rzodeczko.paymentservice.infrastructure.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class PaymentEntity {
     @Id
     @EqualsAndHashCode.Include
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID id;
 
     /**
@@ -33,6 +36,7 @@ public class PaymentEntity {
      * concurrent requests for the same order.</p>
      */
     @Column(unique = true, nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID orderId;
 
     @Column(unique = true, nullable = false)

@@ -2,6 +2,8 @@ package com.rzodeczko.paymentservice.infrastructure.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -30,9 +32,11 @@ public class OutboxEventEntity {
     private UUID id;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID orderId;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID paymentId;
 
     /**

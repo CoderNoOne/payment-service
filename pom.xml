@@ -85,6 +85,10 @@
             <version>${shedlock.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-liquibase</artifactId>
+        </dependency>
+        <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-provider-jdbc-template</artifactId>
             <version>${shedlock.version}</version>
