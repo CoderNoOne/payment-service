@@ -15,6 +15,7 @@
 - [🌐 API Endpoints (Quick Reference)](#api-endpoints)
 - [🚀 Getting Started (Local Environment)](#getting-started)
   - [<img src="https://cdn.simpleicons.org/swagger/85EA2D" alt="Swagger" height="14" /> Swagger UI (Local OpenAPI Preview)](#swagger-ui-local)
+- [🗄️ Database Migrations (Liquibase)](#liquibase)
 - [⚙️ Environment Variables](#environment-variables)
 - [🛠️ Common Issues / Troubleshooting](#common-issues)
 - [🏗️ Architecture](#architecture)
@@ -249,6 +250,17 @@ mvn verify
 
 Coverage report will be generated at `target/site/jacoco/index.html`.
 
+<a id="liquibase"></a>
+## 🗄️ Database Migrations (Liquibase)
+
+[Back to Table of Contents](#toc)
+
+Database schema is managed with Liquibase and executed automatically on application startup.
+
+- **Entry point changelog:** `src/main/resources/db/changelog/db.changelog-master.xml`
+- **Spring config:** `spring.liquibase.change-log=classpath:/db/changelog/db.changelog-master.xml` in `src/main/resources/application.yaml`
+- **Modular changelog files:** `src/main/resources/db/changelog/changes/001-create-payments-table.xml`, `src/main/resources/db/changelog/changes/002-create-outbox-events-table.xml`, `src/main/resources/db/changelog/changes/003-create-shedlock-table.xml`
+
 <a id="environment-variables"></a>
 ## ⚙️ Environment Variables
 
@@ -427,7 +439,6 @@ graph TD
 The project employs a robust testing pyramid with clear separation between unit and integration tests:
 
 * **Unit Tests (18 classes):** Pure domain and infrastructure logic tested in isolation — covering domain models (`Payment`, `OutboxEvent`), custom exceptions, mappers, adapters, and the `OutboxProcessor`/`OutboxEventSender` pipeline. All tests use JUnit 5 and Mockito.
-* **Integration tests execution model:** The current Maven setup uses one test phase (`surefire`) and does not yet define a separate `failsafe` integration-test phase/profile. In practice, tests run together unless you filter by class pattern.
 * **Code Coverage Gate:** JaCoCo enforces a strict minimum of **80% instruction coverage** at the bundle level — the build fails if coverage drops below the threshold.
 
 ### How to run tests
@@ -443,20 +454,6 @@ Run all tests with JaCoCo report + coverage gate (same as CI quality gate):
 ```bash
 mvn verify
 ```
-
-Run selected unit tests only (example class filter):
-
-```bash
-mvn -Dtest="PaymentTest,OutboxEventTest,PaymentServiceTest,OutboxProcessorTest" test
-```
-
-Run selected integration-like/web-layer tests only (example class filter):
-
-```bash
-mvn -Dtest="PaymentServiceApplicationTest,GlobalExceptionHandlerTest" test
-```
-
-> Tip: until a dedicated integration-test profile is added, use `-Dtest="ClassA,ClassB,..."` to run precise subsets.
 
 ### How to interpret JaCoCo report
 
@@ -549,7 +546,6 @@ The service exposes health and readiness endpoints via **Spring Boot Actuator**:
 
 Planned iterations for system evolution include:
 
-* **Liquibase:** Replacing `schema.sql` with versioned, rollback-capable database migrations for safe multi-environment deployments.
 * **Testcontainers:** Ephemeral MySQL instances in integration tests via [Testcontainers](https://testcontainers.com/) — fully isolated, reproducible runs without external DB dependencies.
 * **Event-Driven Outbox:** Transitioning from polling (`OutboxProcessor`) to a message broker (Kafka/RabbitMQ) for lower latency event dispatch.
 
