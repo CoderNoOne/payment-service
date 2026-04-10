@@ -22,10 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.argThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OutboxEventRepositoryAdapterTest {
@@ -74,8 +71,8 @@ class OutboxEventRepositoryAdapterTest {
         assertThat(existingEntity.getProcessedAt()).isEqualTo(event.getProcessedAt());
 
         verify(jpaOutboxEventRepository).findById(id);
-        verify(outboxEventMapper, never()).toEntity(event);
-        verify(jpaOutboxEventRepository, never()).saveAndFlush(existingEntity);
+        verify(outboxEventMapper, times(1)).toEntity(event);
+        verify(jpaOutboxEventRepository, times(1)).saveAndFlush(existingEntity);
     }
 
     @Test
