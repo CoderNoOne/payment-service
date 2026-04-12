@@ -21,8 +21,17 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build & run tests
-        run: mvn verify --batch-mode --no-transfer-progress
+      - name: Build (package)
+        run: mvn clean package --batch-mode --no-transfer-progress
+
+      - name: Run unit tests
+        run: mvn test --batch-mode --no-transfer-progress
+
+      - name: Run integration tests
+        run: mvn failsafe:integration-test failsafe:verify --batch-mode --no-transfer-progress
+
+      - name: Generate JaCoCo report
+        run: mvn jacoco:report --batch-mode --no-transfer-progress
 
       - name: Upload JaCoCo coverage report
         uses: actions/upload-artifact@v4
