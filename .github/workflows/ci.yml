@@ -45,8 +45,7 @@ jobs:
         with:
           files: target/site/jacoco/jacoco.xml
           fail_ci_if_error: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   deploy-to-ubuntu:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -57,29 +56,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create archive
-        run: |
-          tar \
-            --warning=no-file-changed \
-            --exclude=.git \
-            --exclude=.github \
-            --exclude=target \
-            -czf app.tar.gz .
-
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
           cat >> ~/.ssh/config <<EOF
           Host my-ubuntu
             HostName ${{ secrets.SSH_HOST }}
             User ${{ secrets.SSH_USER }}
             IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
           EOF
 
-      - name: Upload app to server (rsync)
+      - name: Upload app to server
         run: |
           rsync -az --delete \
             --exclude='.git' \
