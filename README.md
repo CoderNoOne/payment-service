@@ -26,8 +26,9 @@
 - [📊 Observability](#observability)
 - [📂 Repository Structure](#repository-structure)
 - [🔮 Future Roadmap (Architectural Evolution)](#future-roadmap)
-- [🤝 Contact](#contact)
 - [🚀 Deployment to a Virtual Machine (VM)](#deployment-vm)
+- [🤝 Contact](#contact)
+
 
 <a id="overview"></a>
 ## 📖 Overview
@@ -504,51 +505,31 @@ The service exposes health and readiness endpoints via **Spring Boot Actuator**:
 .
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                        # GitHub Actions CI/CD pipeline
+│       └── ci_cd.yml              # CI/CD pipeline: builds, tests, generates coverage reports and automatically deploys to GCP VM
 ├── src/
 │   ├── main/
 │   │   ├── java/
 │   │   │   └── com/rzodeczko/paymentservice/
-│   │   │       ├── application/
-│   │   │       ├── domain/
-│   │   │       ├── infrastructure/
-│   │   │       ├── presentation/
-│   │   │       └── PaymentServiceApplication.java
+│   │   │       ├── application/        # use case logic, input/output ports
+│   │   │       ├── domain/             # domain model, entities, exceptions
+│   │   │       ├── infrastructure/     # adapters for database, TPay, external integrations
+│   │   │       └── presentation/       # REST controllers, HTTP request handling
 │   │   └── resources/
-│   │       ├── application.yaml
+│   │       ├── application.yaml        # main Spring Boot configuration file
 │   │       └── db/
-│   │           └── changelog/
-│   │               ├── db.changelog-master.xml
-│   │               └── changes/
-│   │                   ├── 001-create-payments-table.xml
-│   │                   ├── 002-create-outbox-events-table.xml
-│   │                   └── 003-create-shedlock-table.xml
+│   │           └── changelog/          # Liquibase migration scripts
 │   └── test/
-│       ├── java/
-│       │   └── com/rzodeczko/paymentservice/
-│       │       ├── infrastructure/
-│       │       │   └── gateway/tpay/adapter/TPayGatewayAdapterTest.java
-│       │       ├── presentation/
-│       │       │   ├── controller/
-│       │       │   │   ├── HealthCheckControllerIT.java
-│       │       │   │   ├── HealthCheckControllerTest.java
-│       │       │   │   ├── HealthCheckSliceIT.java
-│       │       │   │   ├── PaymentControllerIT.java
-│       │       │   │   ├── PaymentControllerSliceIT.java
-│       │       │   │   └── PaymentControllerTest.java
-│       │       │   └── exception/GlobalExceptionHandlerTest.java
-│       │       └── PaymentServiceApplicationTest.java
+│       ├── java/                       # unit and integration tests
 │       └── resources/
-│           ├── application-test.yml
-│           └── schema.sql
-├── .env.example
-├── .env.template
+│           ├── application-test.yml    # test configuration
+│           └── schema.sql              # test database schema
+├── .env.example                       # example environment variables
+├── .env.template                      # .env template for automatic environment generation (CI/CD)
 ├── .gitignore
-├── docker-compose.yml
-├── Dockerfile
-├── openapi.template.yaml
-├── payment-service.iml
-├── pom.xml
+├── docker-compose.yml                 # service and dependency definitions (database, app, swagger)
+├── Dockerfile                         # multi-stage application image build
+├── openapi.template.yaml              # OpenAPI 3.0 spec template, dynamically generated based on environment
+├── pom.xml                            # Maven configuration, dependencies, profiles, tests
 └── README.md
 ```
 
