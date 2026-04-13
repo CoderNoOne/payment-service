@@ -504,38 +504,52 @@ The service exposes health and readiness endpoints via **Spring Boot Actuator**:
 .
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                        # GitHub Actions CI pipeline
+│       └── ci.yml                        # GitHub Actions CI/CD pipeline
 ├── src/
 │   ├── main/
-│   │   ├── java/com/rzodeczko/paymentservice/
-│   │   │   ├── application/
-│   │   │   │   ├── port/input/           # Inbound ports (PaymentUseCase)
-│   │   │   │   ├── port/output/          # Outbound ports (PaymentGatewayPort, NotificationPort)
-│   │   │   │   └── service/              # Domain services (PaymentService)
-│   │   │   ├── domain/
-│   │   │   │   ├── exception/            # Domain exceptions
-│   │   │   │   ├── model/                # Domain models (Payment, OutboxEvent)
-│   │   │   │   └── repository/           # Repository interfaces
-│   │   │   ├── infrastructure/
-│   │   │   │   ├── configuration/        # Spring beans & TPay properties
-│   │   │   │   ├── gateway/tpay/         # TPay adapter & DTOs
-│   │   │   │   ├── notification/         # External notification adapter
-│   │   │   │   ├── outbox/               # Outbox processor & sender
-│   │   │   │   ├── persistence/          # JPA entities, mappers, adapters
-│   │   │   │   ├── transaction/          # Transaction boundary
-│   │   │   │   └── usecase/              # Use case implementations
-│   │   │   └── presentation/
-│   │   │       ├── controller/           # REST controllers
-│   │   │       ├── dto/                  # Request/Response DTOs
-│   │   │       └── exception/            # Global exception handler
+│   │   ├── java/
+│   │   │   └── com/rzodeczko/paymentservice/
+│   │   │       ├── application/
+│   │   │       ├── domain/
+│   │   │       ├── infrastructure/
+│   │   │       ├── presentation/
+│   │   │       └── PaymentServiceApplication.java
 │   │   └── resources/
-│   │       ├── application.yaml          # Application configuration
-│   │       └── schema.sql                # ShedLock table schema
-│   └── test/                             # Unit tests
-├── .env                                  # Environment variables
-├── docker-compose.yml                    # Local container orchestration
-├── Dockerfile                            # Multi-stage Docker build
-└── pom.xml                               # Maven build configuration
+│   │       ├── application.yaml
+│   │       └── db/
+│   │           └── changelog/
+│   │               ├── db.changelog-master.xml
+│   │               └── changes/
+│   │                   ├── 001-create-payments-table.xml
+│   │                   ├── 002-create-outbox-events-table.xml
+│   │                   └── 003-create-shedlock-table.xml
+│   └── test/
+│       ├── java/
+│       │   └── com/rzodeczko/paymentservice/
+│       │       ├── infrastructure/
+│       │       │   └── gateway/tpay/adapter/TPayGatewayAdapterTest.java
+│       │       ├── presentation/
+│       │       │   ├── controller/
+│       │       │   │   ├── HealthCheckControllerIT.java
+│       │       │   │   ├── HealthCheckControllerTest.java
+│       │       │   │   ├── HealthCheckSliceIT.java
+│       │       │   │   ├── PaymentControllerIT.java
+│       │       │   │   ├── PaymentControllerSliceIT.java
+│       │       │   │   └── PaymentControllerTest.java
+│       │       │   └── exception/GlobalExceptionHandlerTest.java
+│       │       └── PaymentServiceApplicationTest.java
+│       └── resources/
+│           ├── application-test.yml
+│           └── schema.sql
+├── .env.example
+├── .env.template
+├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
+├── openapi.template.yaml
+├── payment-service.iml
+├── pom.xml
+└── README.md
 ```
 
 <a id="future-roadmap"></a>
