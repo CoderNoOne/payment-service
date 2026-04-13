@@ -27,6 +27,7 @@
 - [📂 Repository Structure](#repository-structure)
 - [🔮 Future Roadmap (Architectural Evolution)](#future-roadmap)
 - [🤝 Contact](#contact)
+- [🚀 Deployment to a Virtual Machine (VM)](#deployment-vm)
 
 <a id="overview"></a>
 ## 📖 Overview
@@ -547,10 +548,25 @@ Planned iterations for system evolution include:
 * **Testcontainers:** Ephemeral MySQL instances in integration tests via [Testcontainers](https://testcontainers.com/) — fully isolated, reproducible runs without external DB dependencies.
 * **Event-Driven Outbox:** Transitioning from polling (`OutboxProcessor`) to a message broker (Kafka/RabbitMQ) for lower latency event dispatch.
 
+
+
+<a id="deployment-vm"></a>
+## 🚀 Deployment to a Virtual Machine (VM)
+[Back to Table of Contents](#toc)
+
+The current deployment to a GCP virtual machine is for testing/demonstrating purposes only. In production, the entire microservices suite (order, invoice, payments, security) will be deployed using Kubernetes.
+
+The production host address isn’t public for security reasons. If you’d like access, please contact me.
+
+- The deployment process is fully automated and secure.
+- All secrets and environment variables are managed outside the repository.
+- For details, see the `.github/workflows/` directory.
+
+
 <a id="contact"></a>
 ## 🤝 Contact
-
 [Back to Table of Contents](#toc)
 
 Designed and implemented by **Michał Rzodeczko**.
 Feel free to check out my other projects on [GitHub](https://github.com/CoderNoOne).
+
