@@ -29,6 +29,7 @@ public class OutboxEventEntity {
 
     @Id
     @EqualsAndHashCode.Include
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID id;
 
     @Column(nullable = false)
