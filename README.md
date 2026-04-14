@@ -438,8 +438,17 @@ graph TD
 
 [Back to Table of Contents](#toc)
 
+The project employs a robust testing pyramid with clear separation between unit and integration tests:
+
 * **Unit Tests (18 classes):** Pure domain and infrastructure logic tested in isolation — covering domain models (`Payment`, `OutboxEvent`), custom exceptions, mappers, adapters, and the `OutboxProcessor`/`OutboxEventSender` pipeline. All tests use JUnit 5 and Mockito.
 * **Code Coverage Gate:** JaCoCo enforces a strict minimum of **80% instruction coverage** at the bundle level — the build fails if coverage drops below the threshold.
+
+### Test execution details
+
+- **Unit tests:** All classes matching `*Test.java` are executed by the Maven Surefire plugin during the `test` phase (`mvn test`).
+- **Integration tests:** All classes matching `*IT.java` are executed by the Maven Failsafe plugin during the `integration-test` and `verify` phases (`mvn verify`).
+- In the CI pipeline, unit and integration tests are run as separate steps (see `.github/workflows/ci_cd.yml`).
+- This separation is configured in `pom.xml` using the Surefire and Failsafe plugins with appropriate includes.
 
 ### How to run tests
 
@@ -532,6 +541,15 @@ The service exposes health and readiness endpoints via **Spring Boot Actuator**:
 ├── pom.xml                            # Maven configuration, dependencies, profiles, tests
 └── README.md
 ```
+
+#
+# Test execution details:
+#
+# - Unit tests: All classes matching *Test.java are executed by the Maven Surefire plugin during the 'test' phase (mvn test).
+# - Integration tests: All classes matching *IT.java are executed by the Maven Failsafe plugin during the 'integration-test' and 'verify' phases (mvn verify).
+# - In the CI pipeline, unit and integration tests are run as separate steps (see .github/workflows/ci_cd.yml).
+# - This separation is configured in pom.xml using the Surefire and Failsafe plugins with appropriate includes.
+#
 
 <a id="future-roadmap"></a>
 ## 🔮 Future Roadmap (Architectural Evolution)

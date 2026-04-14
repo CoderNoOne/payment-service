@@ -44,18 +44,19 @@ services:
     networks:
       - mr-network
     ports:
-      - "3306:3306"  # Expose for local development; remove in production for better security
+      - "${PAYMENT_SERVICE_MYSQL_DB_PORT}:3306"  # Expose for local development; remove in production for better security
 
   # --------------------------------------------------------------------------------------------------------------------
   # PAYMENT SERVICE
   # --------------------------------------------------------------------------------------------------------------------
   payment-service:
+#    image:
     build:
       context: .
       dockerfile: Dockerfile
     restart: on-failure:5
     ports:
-      - "${PAYMENT_SERVICE_PORT}:${PAYMENT_SERVICE_PORT}"
+      - "${PAYMENT_SERVICE_PORT}:8081"
     depends_on:
       payment-mysql:
         condition: service_healthy
@@ -72,7 +73,8 @@ services:
       TPAY_APP_NOTIFICATION_URL: ${PAYMENT_SERVICE_TPAY_APP_NOTIFICATION_URL}
       TPAY_APP_RETURN_SUCCESS_URL: ${PAYMENT_SERVICE_TPAY_APP_RETURN_SUCCESS_URL}
       TPAY_APP_RETURN_ERROR_URL: ${PAYMENT_SERVICE_TPAY_APP_RETURN_ERROR_URL}
-      SWAGGER_UI_PORT: ${SWAGGER_UI_PORT}
+      SPRINGDOC_API_DOCS_SWAGGER_ENABLED: ${SPRINGDOC_API_DOCS_SWAGGER_ENABLED-false}
+
     # Runbook: 768M provides safe JVM headroom for heap + metaspace + native overhead.
     # Workload is I/O-bound (DB + payment provider latency), so 1 vCPU is typically enough.
     # Scale out first; increase per-container CPU only after saturation is observed.
@@ -89,31 +91,7 @@ services:
     networks:
       - mr-network
 
-  # --------------------------------------------------------------------------------------------------------------------
-  # SWAGGER UI
-  # --------------------------------------------------------------------------------------------------------------------
-  swagger-ui-payment:
-    image: swaggerapi/swagger-ui:v5.32.2
-    restart: unless-stopped
-    profiles:
-      - docs
-    ports:
-      - "${SWAGGER_UI_PORT}:8080"
-    environment:
-      # Passed into the container shell — sed substitutes this into openapi.template.yaml at startup
-      SWAGGER_UI_PORT: ${SWAGGER_UI_PORT}
-      SWAGGER_JSON: /tmp/openapi.yaml
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        sed "s|{{ PAYMENT_SERVICE_PORT }}|$PAYMENT_SERVICE_PORT|g" \
-          /tmp/openapi.template.yaml > /tmp/openapi.yaml
-        exec /docker-entrypoint.sh nginx -g 'daemon off;'
-    volumes:
-      - ./openapi.template.yaml:/tmp/openapi.template.yaml:ro
-    networks:
-      - mr-network
+
 
 
 volumes:

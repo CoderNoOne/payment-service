@@ -89,5 +89,15 @@ resilience4j:
         ignore-exceptions:
           - java.lang.IllegalStateException
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
 
-swagger-ui-port: ${SWAGGER_UI_PORT}
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_API_DOCS_SWAGGER_ENABLED:false}
+

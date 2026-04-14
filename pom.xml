@@ -10,32 +10,28 @@
     </parent>
     <groupId>com.app</groupId>
     <artifactId>payment-service</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>payment-service</name>
     <description>payment-service</description>
-    <url/>
-    <licenses>
-        <license/>
-    </licenses>
-    <developers>
-        <developer/>
-    </developers>
-    <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
-    </scm>
+
     <properties>
         <java.version>25</java.version>
         <shedlock.version>6.0.2</shedlock.version>
         <jacoco.version>0.8.14</jacoco.version>
-        <resilience4j.version>2.2.0</resilience4j.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <openapi.version>3.0.1</openapi.version>
+        <failsafe.version>3.2.5</failsafe.version>
+        <surefire.version>3.2.5</surefire.version>
     </properties>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${openapi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -73,12 +69,9 @@
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot4</artifactId>
-            <version>2.3.1-SNAPSHOT</version>
+            <version>${resilience4j.version}</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>org.springframework.boot</groupId>-->
-<!--            <artifactId>spring-boot-starter-aop</artifactId>-->
-<!--        </dependency>-->
+
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-spring</artifactId>
@@ -114,21 +107,6 @@
         </dependency>
     </dependencies>
 
-
-    <repositories>
-        <!--
-        Sonatype is used for now for resilience4j snapshot until spring boot 4 support is officially released.
-        Once there is spring boot 4 support released, this snapshot repo can be removed.
-        -->
-        <repository>
-            <id>sonatype-snapshots</id>
-            <url>https://central.sonatype.com/repository/maven-snapshots</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
-
     <build>
         <plugins>
             <plugin>
@@ -159,7 +137,7 @@
 
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>${surefire.version}</version>
                 <configuration>
                     <includes>
                         <include>**/*Test.java</include>
@@ -169,7 +147,7 @@
 
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>${failsafe.version}</version>
                 <configuration>
                     <includes>
                         <include>**/*IT.java</include>
@@ -184,8 +162,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-
 
 
             <plugin>
