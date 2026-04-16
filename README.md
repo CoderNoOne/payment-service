@@ -394,14 +394,6 @@ The service exposes health endpoints through Spring Boot Actuator.
 ├── pom.xml
 └── README.md
 ```
-
-## 🔮 Future Roadmap
-
-Planned improvements include:
-
-- Testcontainers for isolated integration tests.
-- Kafka or RabbitMQ instead of polling for outbox delivery.
-
 ## 🤝 Contact
 
 Designed and implemented by **Michał Rzodeczko**.  
