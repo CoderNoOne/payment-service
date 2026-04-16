@@ -356,7 +356,7 @@ mvn test
 mvn verify
 ```
 
-## 🛡️ CI/CD Pipeline
+## 🛡️ Continous Integration
 
 GitHub Actions runs the build and tests on push and pull request to `master`.  
 The pipeline generates JaCoCo reports, uploads artifacts, and sends coverage data to Codecov.
@@ -401,8 +401,6 @@ Planned improvements include:
 
 - Testcontainers for isolated integration tests.
 - Kafka or RabbitMQ instead of polling for outbox delivery.
-- OpenTelemetry tracing.
-- Prometheus metrics.
 
 ## 🤝 Contact
 
