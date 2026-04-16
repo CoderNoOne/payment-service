@@ -13,6 +13,24 @@ Payment Service is a production-ready backend for secure online payment initiati
 
 The project showcases modern backend engineering practices: Hexagonal Architecture (Ports & Adapters), the Transactional Outbox Pattern, containerized deployment, and resilient integration with external services.
 
+<a id="toc"></a>
+## 📚 Table of Contents
+
+- [📖 Overview](#overview)
+- [🔄 How It Works](#how-it-works)
+- [🌐 API Endpoints](#api-endpoints)
+- [🚀 Getting Started](#getting-started)
+- [🗄️ Database Migrations](#database-migrations)
+- [⚙️ Environment Variables](#environment-variables)
+- [🛠️ Common Issues](#common-issues)
+- [🏗️ Architecture](#architecture)
+- [💻 Tech Stack](#tech-stack)
+- [🧪 Testing Strategy](#testing-strategy)
+- [🛡️ Continous Integration](#continous-integration)
+- [📊 Observability](#observability)
+- [📂 Repository Structure](#repository-structure)
+- [🤝 Contact](#contact)
+
 ## 🔄 How It Works
 
 This is the end-to-end payment flow:
@@ -128,6 +146,8 @@ curl "http://localhost:8081/"
 
 ## 🚀 Getting Started
 
+[Back to Table of Contents](#toc)
+
 ### Prerequisites
 
 - Docker & Docker Compose v2+
@@ -197,6 +217,8 @@ docker-compose up -d --build
 
 ## 🗄️ Database Migrations
 
+[Back to Table of Contents](#toc)
+
 Liquibase runs automatically on startup.
 
 - Entry point changelog: `src/main/resources/db/changelog/db.changelog-master.xml`
@@ -207,6 +229,8 @@ Liquibase runs automatically on startup.
    - `003-create-shedlock-table.xml`
 
 ## ⚙️ Environment Variables
+
+[Back to Table of Contents](#toc)
 
 ### MySQL
 
@@ -249,6 +273,8 @@ If this value is incorrect, webhook verification fails and the notification is r
 
 ## 🛠️ Common Issues
 
+[Back to Table of Contents](#toc)
+
 ### 1) Docker does not start
 
 Symptoms: containers exit immediately, or `docker-compose up` fails.  
@@ -283,6 +309,8 @@ This usually means invalid credentials or a mismatch between sandbox and product
 Verify `client_id`, `client_secret`, and `security_code`, and restart the service after any `.env` change.
 
 ## 🏗️ Architecture
+
+[Back to Table of Contents](#toc)
 
 The system follows Hexagonal Architecture and the Transactional Outbox Pattern.
 
@@ -326,6 +354,8 @@ graph TD
 
 ## 💻 Tech Stack
 
+[Back to Table of Contents](#toc)
+
 | Layer | Technology |
 |---|---|
 | Language | Java 25 |
@@ -341,6 +371,8 @@ graph TD
 | Other | Lombok, Commons Codec, Spring RestClient, SpringDoc OpenAPI |
 
 ## 🧪 Testing Strategy
+
+[Back to Table of Contents](#toc)
 
 The project uses a clear testing pyramid with unit and integration tests separated by Maven plugins.
 
@@ -358,15 +390,21 @@ mvn verify
 
 ## 🛡️ Continous Integration
 
+[Back to Table of Contents](#toc)
+
 GitHub Actions runs the build and tests on push and pull request to `master`.  
 The pipeline generates JaCoCo reports, uploads artifacts, and sends coverage data to Codecov.
 
 ## 📊 Observability
 
+[Back to Table of Contents](#toc)
+
 The service exposes health endpoints through Spring Boot Actuator.  
 `/actuator/health` is used for Docker health checks and orchestration probes.
 
 ## 📂 Repository Structure
+
+[Back to Table of Contents](#toc)
 
 ```text
 .
@@ -394,7 +432,10 @@ The service exposes health endpoints through Spring Boot Actuator.
 ├── pom.xml
 └── README.md
 ```
+
 ## 🤝 Contact
+
+[Back to Table of Contents](#toc)
 
 Designed and implemented by **Michał Rzodeczko**.  
 GitHub: [mrzodeczko-dev](https://github.com/mrzodeczko-dev)
