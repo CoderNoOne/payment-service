@@ -1,126 +1,44 @@
 # 🚀 Payment Service - Hexagonal Payment Processing Platform
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
-[![Resilience4j](https://img.shields.io/badge/Resilience4j-2.2.0-informational.svg)](https://resilience4j.readme.io/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+| [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
+| [![Resilience4j](https://img.shields.io/badge/Resilience4j-2.4.0-informational.svg)](https://resilience4j.readme.io/)
+| [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![codecov](https://codecov.io/gh/CoderNoOne/payment-service/branch/master/graph/badge.svg)](https://codecov.io/gh/CoderNoOne/payment-service)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-<a id="toc"></a>
-## 📚 Table of Contents
-
-- [📖 Overview](#overview)
-- [🔄 How It Works (End-to-End Payment Flow)](#how-it-works)
-- [🌐 API Endpoints (Quick Reference)](#api-endpoints)
-- [🚀 Getting Started (Local Environment)](#getting-started)
-  - [<img src="https://cdn.simpleicons.org/swagger/85EA2D" alt="Swagger" height="14" /> Swagger UI (Local OpenAPI Preview)](#swagger-ui-local)
-- [🗄️ Database Migrations (Liquibase)](#liquibase)
-- [⚙️ Environment Variables](#environment-variables)
-- [🛠️ Common Issues / Troubleshooting](#common-issues)
-- [🏗️ Architecture](#architecture)
-- [✨ Technical Highlights & Engineering Decisions](#technical-highlights)
-- [💻 Tech Stack](#tech-stack)
-- [🧪 Testing Strategy & Quality Assurance](#testing-strategy)
-- [🛡️ CI/CD Pipeline](#cicd-pipeline)
-- [📊 Observability](#observability)
-- [📂 Repository Structure](#repository-structure)
-- [🔮 Future Roadmap (Architectural Evolution)](#future-roadmap)
-- [🚀 Deployment to a Virtual Machine (VM)](#deployment-vm)
-- [🤝 Contact](#contact)
-
-
-<a id="overview"></a>
 ## 📖 Overview
 
-[Back to Table of Contents](#toc)
+Payment Service is a production-ready backend for secure online payment initiation, TPay webhook handling, and reliable outbound notifications to an external service.
 
-Payment Service is a production-ready, modular payment processing backend built to handle secure online payment initiation, webhook notification handling, and reliable event publishing via the TPay payment gateway.
+The project showcases modern backend engineering practices: Hexagonal Architecture (Ports & Adapters), the Transactional Outbox Pattern, containerized deployment, and resilient integration with external services.
 
-This repository serves as a showcase of modern backend engineering practices (as of 2026), demonstrating clean Hexagonal Architecture (Ports & Adapters), the Transactional Outbox Pattern, and a containerized development environment ready for seamless deployment.
+## 🔄 How It Works
 
-<a id="how-it-works"></a>
-## 🔄 How It Works (End-to-End Payment Flow)
+This is the end-to-end payment flow:
 
-[Back to Table of Contents](#toc)
+1. The client calls `POST /payments/init`.
+2. The service validates the request and creates a TPay transaction.
+3. TPay returns a redirect URL and external transaction ID.
+4. The customer completes payment on the TPay checkout page.
+5. TPay sends a webhook to `POST /payments/notification`.
+6. The service verifies the signature, updates the payment state, and stores an outbox event in the same database transaction.
+7. `OutboxProcessor` polls pending events and sends notifications to the external notification service.
+8. Successful delivery marks the outbox event as sent; failed delivery leaves it pending for retry.
 
-This is the complete payment lifecycle from API request to downstream notification delivery:
+This approach keeps the payment state consistent even when external systems are temporarily unavailable.
 
+## 🌐 API Endpoints
 
-### Interaction sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Client
-    participant PS as Payment Service
-    participant T as TPay
-    participant DB as Database
-    participant OP as OutboxProcessor
-    participant NS as External Notification Service
-
-    C->>PS: POST /payments/init
-    PS->>T: Create transaction
-    T-->>PS: transactionId + redirectUrl
-    PS-->>C: paymentId + redirectUrl
-
-    C->>T: Redirect customer to checkout
-    T-->>PS: POST /payments/notification
-
-    PS->>PS: Verify notification signature
-    PS->>DB: Update payment state
-    PS->>DB: Save outbox event\n(same transaction)
-
-    OP->>DB: Poll pending outbox events
-    DB-->>OP: Pending events
-    OP->>NS: Send event notification
-
-    alt Delivery successful
-        OP->>DB: Mark outbox event as sent
-    else Delivery failed
-        OP->>DB: Leave event pending
-    end
-```
-
-1. **Payment initiation (`POST /payments/init`)**  
-   The client sends payment data (amount, order ID, customer details) to the Payment Service. The application validates input and invokes the payment use case.
-
-2. **Create payment in TPay + redirect URL**  
-   The service calls TPay API to create a transaction and receives gateway data (including redirect URL and external transaction ID). The redirect URL is returned to the client.
-
-3. **Customer redirect to TPay checkout**  
-   The frontend redirects the customer to TPay-hosted payment page, where the user completes or cancels the payment.
-
-4. **TPay webhook callback (`/payments/notification`)**  
-   After payment status changes, TPay sends a server-to-server webhook to the configured notification endpoint. The service verifies the notification signature and parses payment status.
-
-5. **Transactional state update + outbox write**  
-   In one local database transaction, the service updates payment state and saves a matching outbox event. This guarantees that business state and integration event stay consistent.
-
-6. **Outbox processor picks pending events**  
-   `OutboxProcessor` periodically scans unsent outbox records (with ShedLock protection to avoid duplicate processing in multi-instance deployments).
-
-7. **External notification delivery**  
-   `OutboxEventSender` publishes the event to the external notification service. On success, the outbox record is marked as sent; on failure, it remains pending and is retried on the next cycle.
-
-8. **Eventual consistency and reliability**  
-   Even if external systems are temporarily unavailable, payment status remains persisted, and notification delivery is retried asynchronously until successful.
-
-<a id="api-endpoints"></a>
-## 🌐 API Endpoints (Quick Reference)
-
-[Back to Table of Contents](#toc)
-
-Base URL (local): `http://localhost:8081`
+Base URL: `http://localhost:8081`
 
 | Method | Path | Purpose | Request | Success | Common errors |
 |---|---|---|---|---|---|
 | `GET` | `/` | Basic service health check | none | `200 OK` (`{"message":"PAYMENT SERVICE OK"}`) | - |
-| `POST` | `/payments/init` | Initialize payment and get redirect URL | JSON: `orderId`, `amount`, `email`, `name` | `200 OK` (`paymentId`, `redirectUrl`) | `400` (validation), `409` (payment exists), `500` (integration/internal) |
-| `POST` | `/payments/notification` | Handle TPay webhook (form data) | `application/x-www-form-urlencoded` with `id`, `tr_id`, `tr_date`, `tr_crc`, `tr_amount`, `tr_paid`, `tr_status`, `tr_email`, `tr_error`, `tr_desc`, `md5sum` | `200 OK` (`{"result":"TRUE"}`) | `400` (`FALSE`, bad payload/signature), `500` (`FALSE`, retry scenario) |
+| `POST` | `/payments/init` | Initialize payment and get redirect URL | JSON: `orderId`, `amount`, `email`, `name` | `200 OK` (`paymentId`, `redirectUrl`) | `400` validation, `409` payment exists, `500` integration/internal |
+| `POST` | `/payments/notification` | Handle TPay webhook | `application/x-www-form-urlencoded` with `id`, `tr_id`, `tr_date`, `tr_crc`, `tr_amount`, `tr_paid`, `tr_status`, `tr_email`, `tr_error`, `tr_desc`, `md5sum` | `200 OK` (`{"result":"TRUE"}`) | `400` false/bad payload, `500` retry scenario |
 | `GET` | `/payments/success` | Success callback endpoint | none | `200 OK` (`{"message":"PAYMENT OK"}`) | - |
-
-`GET /payments/error` is also available and returns `200 OK` with `{"message":"PAYMENT ERROR"}`.
+| `GET` | `/payments/error` | Error callback endpoint | none | `200 OK` (`{"message":"PAYMENT ERROR"}`) | - |
 
 ### cURL examples
 
@@ -130,14 +48,14 @@ Initialize payment:
 curl -X POST "http://localhost:8081/payments/init" \
   -H "Content-Type: application/json" \
   -d '{
-    "orderId": "11111111-1111-1111-1111-111111111111",
+    "orderId": "0555b450-db31-472e-9bcb-9524f8d964bd",
     "amount": 129.99,
     "email": "customer@example.com",
     "name": "John Doe"
   }'
 ```
 
-TPay notification callback (example payload):
+TPay notification callback:
 
 ```bash
 curl -X POST "http://localhost:8081/payments/notification" \
@@ -145,13 +63,13 @@ curl -X POST "http://localhost:8081/payments/notification" \
   --data-urlencode "id=1010" \
   --data-urlencode "tr_id=TR-123" \
   --data-urlencode "tr_date=2026-04-08 12:30:00" \
-  --data-urlencode "tr_crc=11111111-1111-1111-1111-111111111111" \
+  --data-urlencode "tr_crc=0555b450-db31-472e-9bcb-9524f8d964bd" \
   --data-urlencode "tr_amount=129.99" \
   --data-urlencode "tr_paid=129.99" \
   --data-urlencode "tr_status=TRUE" \
   --data-urlencode "tr_email=customer@example.com" \
   --data-urlencode "tr_error=none" \
-  --data-urlencode "tr_desc=Order 11111111-1111-1111-1111-111111111111" \
+  --data-urlencode "tr_desc=Order 0555b450-db31-472e-9bcb-9524f8d964bd" \
   --data-urlencode "md5sum=replace_with_valid_signature"
 ```
 
@@ -161,18 +79,17 @@ Health check:
 curl "http://localhost:8081/"
 ```
 
-<a id="getting-started"></a>
-## 🚀 Getting Started (Local Environment)
-
-[Back to Table of Contents](#toc)
+## 🚀 Getting Started
 
 ### Prerequisites
-* Docker & Docker Compose v2+
-* Java 25+ (if running outside containers)
-* Maven 3.9+ (if running outside containers)
 
-### 1. Environment Configuration
-Create a `.env` file in the project root with the following variables:
+- Docker & Docker Compose v2+
+- Java 25+ if building locally
+- Maven 3.9+ if building locally
+
+### 1. Environment configuration
+
+Create a `.env` file in the project root:
 
 ```bash
 # MySQL
@@ -189,196 +106,144 @@ PAYMENT_SERVICE_MYSQL_MAX_CONNECTIONS=100
 PAYMENT_SERVICE_PORT=8081
 PAYMENT_SERVICE_APPLICATION_NAME=payment-service
 
-# TPay (sandbox: https://panel.sandbox.tpay.com/)
+# TPay (sandbox)
 PAYMENT_SERVICE_TPAY_API_URL=https://openapi.sandbox.tpay.com
 PAYMENT_SERVICE_TPAY_API_CLIENT_ID=your_client_id
 PAYMENT_SERVICE_TPAY_API_CLIENT_SECRET=your_client_secret
 PAYMENT_SERVICE_TPAY_API_SECURITY_CODE=your_security_code
-PAYMENT_SERVICE_TPAY_APP_NOTIFICATION_URL=https://yourdomain.com/api/payments/notifications
-PAYMENT_SERVICE_TPAY_APP_RETURN_SUCCESS_URL=https://yourdomain.com/payment/success
-PAYMENT_SERVICE_TPAY_APP_RETURN_ERROR_URL=https://yourdomain.com/payment/error
+PAYMENT_SERVICE_TPAY_APP_NOTIFICATION_URL=https://yourdomain.com/payments/notification
+PAYMENT_SERVICE_TPAY_APP_RETURN_SUCCESS_URL=https://yourdomain.com/payments/success
+PAYMENT_SERVICE_TPAY_APP_RETURN_ERROR_URL=https://yourdomain.com/payments/error
+
 # Swagger UI
 SWAGGER_UI_PORT=your_preferred_port
 ```
 
-> **🌍 Public URL for TPay callbacks:** TPay webhook notifications must reach your app from the internet, so your local service needs a public HTTPS address.
+> **Public callback URL:** TPay webhook notifications must reach your app from the internet, so local development requires a public HTTPS address.
 >
-> You can expose local port `8081` with ngrok:
+> You can expose your local port with ngrok:
 >
 > ```bash
 > ngrok http 8081
 > ```
 >
-> Then replace `https://yourdomain.com` in `.env` with your ngrok URL (for example `https://abcd-1234.ngrok-free.app`) in:
-> - `PAYMENT_SERVICE_TPAY_APP_NOTIFICATION_URL`
-> - `PAYMENT_SERVICE_TPAY_APP_RETURN_SUCCESS_URL`
-> - `PAYMENT_SERVICE_TPAY_APP_RETURN_ERROR_URL`
+> Then replace `https://yourdomain.com` in `.env` with your public ngrok URL.
 
-> **💡 TPay Sandbox:** You can register and configure your TPay test credentials at [panel.sandbox.tpay.com](https://panel.sandbox.tpay.com/). The sandbox environment allows full payment flow testing without real transactions.
+### 2. Start infrastructure
 
-### 2. Bootstrapping the Infrastructure
-Spin up the database and service with a single command:
+```bash
+docker-compose up -d
+```
+
+By default, `docker-compose.yml` uses a pre-built image for faster startup. If you want to build locally, enable the `build` section and run:
 
 ```bash
 docker-compose up -d --build
 ```
 
-### 3. Verification
-* Payment Service API: `http://localhost:8081`
-* Health Check: `http://localhost:8081/actuator/health`
-* MySQL: `localhost:3306` (via configured port)
+### 3. Verify startup
 
-<a id="swagger-ui-local"></a>
-### 4. Swagger UI (Local OpenAPI Preview)
+- Application: `http://localhost:8081`
+- Health: `http://localhost:8081/actuator/health`
+- Swagger UI: `http://localhost:8081/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8081/v3/api-docs`
 
-The repository includes `openapi.template.yaml`. The Swagger UI container renders runtime `openapi.yaml` from this template using `.env`.
+## 🗄️ Database Migrations
 
-```powershell
-docker compose --profile docs up -d --build
-```
+Liquibase runs automatically on startup.
 
-Then open:
+- Entry point changelog: `src/main/resources/db/changelog/db.changelog-master.xml`
+- Spring config: `spring.liquibase.change-log=classpath:/db/changelog/db.changelog-master.xml`
+- Modular changelogs:
+   - `001-create-payments-table.xml`
+   - `002-create-outbox-events-table.xml`
+   - `003-create-shedlock-table.xml`
 
-- `http://localhost:{SWAGGER_UI_PORT}` to access the interactive API documentation
-
-> Note: `SWAGGER_UI_PORT` from `.env` is passed to the Swagger container and injected into `servers[0].url` at runtime.
-
-
-### 5. Running Tests Locally
-
-```bash
-mvn verify
-```
-
-Coverage report will be generated at `target/site/jacoco/index.html`.
-
-<a id="liquibase"></a>
-## 🗄️ Database Migrations (Liquibase)
-
-[Back to Table of Contents](#toc)
-
-Database schema is managed with Liquibase and executed automatically on application startup.
-
-- **Entry point changelog:** `src/main/resources/db/changelog/db.changelog-master.xml`
-- **Spring config:** `spring.liquibase.change-log=classpath:/db/changelog/db.changelog-master.xml` in `src/main/resources/application.yaml`
-- **Modular changelog files:** `src/main/resources/db/changelog/changes/001-create-payments-table.xml`, `src/main/resources/db/changelog/changes/002-create-outbox-events-table.xml`, `src/main/resources/db/changelog/changes/003-create-shedlock-table.xml`
-
-<a id="environment-variables"></a>
 ## ⚙️ Environment Variables
-
-[Back to Table of Contents](#toc)
-
-The project reads values from `.env` (used by Docker Compose). Below is a practical reference for each variable.
-
-> Note: in `docker-compose.yml`, `PAYMENT_SERVICE_TPAY_*` variables are mapped to container-level `TPAY_*` variables consumed by `application.yaml`.
 
 ### MySQL
 
-| Variable | Required | Description | Allowed / expected values | Example |
-|---|---|---|---|---|
-| `PAYMENT_SERVICE_MYSQL_DB_HOST` | yes | Hostname of MySQL service used by the app container. | Docker service name or host/IP. | `payment-mysql` |
-| `PAYMENT_SERVICE_MYSQL_DB_PORT` | yes | Host port exposed for MySQL access from your machine. | Free TCP port (usually `3306` or custom). | `3308` |
-| `PAYMENT_SERVICE_MYSQL_DB_NAME` | yes | Database/schema name created at startup. | Valid MySQL schema name. | `payments_db` |
-| `PAYMENT_SERVICE_MYSQL_DB_USER` | yes | Application DB user. | Non-root username. | `user` |
-| `PAYMENT_SERVICE_MYSQL_DB_PASSWORD` | yes | Password for DB user. | Strong secret string. | `user1234` |
-| `PAYMENT_SERVICE_MYSQL_DB_ROOT_PASSWORD` | yes | Root password for MySQL container initialization. | Strong secret string. | `root` |
-| `PAYMENT_SERVICE_MYSQL_INNODB_BUFFER_POOL_SIZE` | optional (recommended) | InnoDB memory buffer size. | MySQL memory format (`128M`, `256M`, ...). | `256M` |
-| `PAYMENT_SERVICE_MYSQL_MAX_CONNECTIONS` | optional (recommended) | Max MySQL concurrent connections. | Positive integer. | `200` |
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `PAYMENT_SERVICE_MYSQL_DB_HOST` | yes | MySQL host used by the app container | `payment-mysql` |
+| `PAYMENT_SERVICE_MYSQL_DB_PORT` | yes | Host port exposed for MySQL access | `3308` |
+| `PAYMENT_SERVICE_MYSQL_DB_NAME` | yes | Database/schema name | `payments_db` |
+| `PAYMENT_SERVICE_MYSQL_DB_USER` | yes | Application DB user | `user` |
+| `PAYMENT_SERVICE_MYSQL_DB_PASSWORD` | yes | Password for DB user | `user1234` |
+| `PAYMENT_SERVICE_MYSQL_DB_ROOT_PASSWORD` | yes | Root password for MySQL init | `root` |
+| `PAYMENT_SERVICE_MYSQL_INNODB_BUFFER_POOL_SIZE` | optional | InnoDB buffer size | `256M` |
+| `PAYMENT_SERVICE_MYSQL_MAX_CONNECTIONS` | optional | Max concurrent connections | `200` |
 
 ### Application
 
-| Variable | Required | Description | Allowed / expected values | Example |
-|---|---|---|---|---|
-| `PAYMENT_SERVICE_PORT` | yes | HTTP port exposed by the payment service container. | Free TCP port. | `8081` |
-| `PAYMENT_SERVICE_APPLICATION_NAME` | optional | Spring application name (logging/metadata). | Any non-empty string. | `payment-service` |
-| `PAYMENT_SERVICE_OPENAPI_BASE_URL` | optional | Base URL injected into `openapi.template.yaml` by the Swagger UI container at runtime (`servers[0].url`). | Full HTTP/HTTPS URL. | `http://localhost:8081` |
-| `SWAGGER_UI_PORT` | optional | Host port used by Swagger UI container (compose profile `docs`). Set this to your preferred free local port. | Free TCP port. | `9000` |
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `PAYMENT_SERVICE_PORT` | yes | HTTP port exposed by the service | `8081` |
+| `PAYMENT_SERVICE_APPLICATION_NAME` | optional | Spring app name | `payment-service` |
+| `PAYMENT_SERVICE_OPENAPI_BASE_URL` | optional | Base URL for Swagger template | `http://localhost:8081` |
+| `SWAGGER_UI_PORT` | optional | Port for Swagger UI container | `9000` |
 
 ### TPay
 
-| Variable | Required | Description | Allowed / expected values | Example |
-|---|---|---|---|---|
-| `PAYMENT_SERVICE_TPAY_API_URL` | yes | Base URL for TPay API. | Sandbox: `https://openapi.sandbox.tpay.com`, Prod: TPay production OpenAPI URL. | `https://openapi.sandbox.tpay.com` |
-| `PAYMENT_SERVICE_TPAY_API_CLIENT_ID` | yes | OAuth client identifier used to authenticate against TPay API. | Value generated in TPay panel for your merchant app. | `...` |
-| `PAYMENT_SERVICE_TPAY_API_CLIENT_SECRET` | yes | OAuth client secret for TPay API token exchange. | Secret generated in TPay panel. | `...` |
-| `PAYMENT_SERVICE_TPAY_API_SECURITY_CODE` | yes | Merchant security code used to verify webhook signature (`md5sum`). | Secret value from TPay panel, exact match required. | `...` |
-| `PAYMENT_SERVICE_TPAY_APP_NOTIFICATION_URL` | yes | Public webhook endpoint called by TPay after payment status changes. | Public HTTPS URL reachable from internet. | `https://<domain>/payments/notification` |
-| `PAYMENT_SERVICE_TPAY_APP_RETURN_SUCCESS_URL` | yes | URL where customer is redirected after successful payment flow. | Public HTTPS URL. | `https://<domain>/payments/success` |
-| `PAYMENT_SERVICE_TPAY_APP_RETURN_ERROR_URL` | yes | URL where customer is redirected after failed/cancelled payment flow. | Public HTTPS URL. | `https://<domain>/payments/error` |
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `PAYMENT_SERVICE_TPAY_API_URL` | yes | TPay API base URL | `https://openapi.sandbox.tpay.com` |
+| `PAYMENT_SERVICE_TPAY_API_CLIENT_ID` | yes | OAuth client ID | `...` |
+| `PAYMENT_SERVICE_TPAY_API_CLIENT_SECRET` | yes | OAuth client secret | `...` |
+| `PAYMENT_SERVICE_TPAY_API_SECURITY_CODE` | yes | Merchant security code for webhook verification | `...` |
+| `PAYMENT_SERVICE_TPAY_APP_NOTIFICATION_URL` | yes | Public webhook endpoint | `https://<domain>/payments/notification` |
+| `PAYMENT_SERVICE_TPAY_APP_RETURN_SUCCESS_URL` | yes | Redirect after success | `https://<domain>/payments/success` |
+| `PAYMENT_SERVICE_TPAY_APP_RETURN_ERROR_URL` | yes | Redirect after error/cancel | `https://<domain>/payments/error` |
 
-### What is `PAYMENT_SERVICE_TPAY_API_SECURITY_CODE`?
+### Important note
 
-- It is the **merchant security code** used to validate TPay notification signature (`md5sum`) server-side.
-- If this value is wrong, webhook verification fails and notifications are rejected (for example `FALSE` / invalid signature errors).
-- Where to find it in TPay panel: merchant settings related to notifications/security (in sandbox panel, under notification security configuration).
+`PAYMENT_SERVICE_TPAY_API_SECURITY_CODE` is used to validate the `md5sum` signature in incoming TPay webhook notifications.  
+If this value is incorrect, webhook verification fails and the notification is rejected.
 
-### Required vs optional (quick summary)
-
-- **Required in practice:** all `PAYMENT_SERVICE_TPAY_*`, DB credentials/host/name/port, and `PAYMENT_SERVICE_PORT`.
-- **Optional/tunable:** `PAYMENT_SERVICE_APPLICATION_NAME`, `PAYMENT_SERVICE_MYSQL_INNODB_BUFFER_POOL_SIZE`, `PAYMENT_SERVICE_MYSQL_MAX_CONNECTIONS`.
-
-<a id="common-issues"></a>
-## 🛠️ Common Issues / Troubleshooting
-
-[Back to Table of Contents](#toc)
+## 🛠️ Common Issues
 
 ### 1) Docker does not start
 
-- **Symptoms:** `docker-compose up` fails, containers exit immediately, or build hangs.
-- **Most common causes:** Port conflict, stale containers/images, invalid `.env` values.
-- **What to do:**
+Symptoms: containers exit immediately, or `docker-compose up` fails.  
+Common causes: port conflict, stale containers, invalid `.env` values, or missing image.
+
+Useful commands:
 
 ```bash
 docker compose ps
 docker compose config
-docker compose down
-docker compose up -d --build
+docker compose down --volumes
+docker compose up -d
 ```
 
-If ports are already in use, change host ports in `.env`/`docker-compose.yml` (for example app or MySQL port mappings).
+If ports are busy, change host ports in `.env`, for example `PAYMENT_SERVICE_PORT=8082` or `PAYMENT_SERVICE_MYSQL_DB_PORT=3307`.
 
 ### 2) Database is not ready
 
-- **Symptoms:** App logs show DB connection errors at startup (`Communications link failure`, `Connection refused`).
-- **Most common cause:** MySQL container is still booting while app tries to connect.
-- **What to do:**
+Symptoms: connection errors on startup such as `Communications link failure` or `Connection refused`.  
+Most often the app starts before MySQL is fully healthy.
+
+Check logs:
 
 ```bash
-docker compose ps
 docker compose logs payment-mysql --tail 200
 docker compose logs payment-service --tail 200
 ```
 
-Verify `PAYMENT_SERVICE_MYSQL_*` values in `.env` (host, port, db name, user, password) and wait until MySQL is healthy before retrying app startup.
+### 3) TPay returns 401
 
-### 3) TPay returns 401 (Unauthorized)
+This usually means invalid credentials or a mismatch between sandbox and production URL.  
+Verify `client_id`, `client_secret`, and `security_code`, and restart the service after any `.env` change.
 
-- **Symptoms:** Payment creation/authentication call fails with HTTP `401`.
-- **Most common causes:** Wrong `client_id`/`client_secret`, mismatched sandbox vs production URL, revoked/rotated credentials.
-- **What to do:**
-
-1. Validate `PAYMENT_SERVICE_TPAY_API_CLIENT_ID` and `PAYMENT_SERVICE_TPAY_API_CLIENT_SECRET`.
-2. Ensure URL/environment match (`sandbox` credentials with sandbox API URL).
-3. Confirm credentials in TPay panel and rotate secret if needed.
-4. Restart service after `.env` changes.
-
-```bash
-docker compose up -d --build
-docker compose logs payment-service --tail 200
-```
-
-<a id="architecture"></a>
 ## 🏗️ Architecture
 
-[Back to Table of Contents](#toc)
-
-The system follows a **Hexagonal Architecture (Ports & Adapters)** approach, strictly separating domain logic from infrastructure concerns. The Transactional Outbox Pattern guarantees reliable event delivery without distributed transactions.
+The system follows Hexagonal Architecture and the Transactional Outbox Pattern.
 
 ```mermaid
 graph TD
     Client([Client App / Postman]) --> PC[PaymentController]
     PC --> PUC[PaymentUseCase Port]
-    PUC --> PS[PaymentService - Domain Logic]
+    PUC --> PS[PaymentService]
 
     PS --- PR[PaymentRepository Port]
     PS --- PGP[PaymentGatewayPort]
@@ -388,8 +253,8 @@ graph TD
     PGP --> TPA[TPayGatewayAdapter]
     NP --> ENA[ExternalServiceNotificationAdapter]
 
-    PRA --- DB[(MySQL 9.6)]
-    TPA --- TPAY{{TPay Payment API}}
+    PRA --- DB[(MySQL)]
+    TPA --- TPAY{{TPay API}}
     ENA --- EXT{{External Notification Service}}
 
     PS --> OE[OutboxEvent]
@@ -399,187 +264,100 @@ graph TD
 
     OP[OutboxProcessor + ShedLock] --> OER
     OP --> OES[OutboxEventSender]
+    OES --- EXT
 ```
 
-<a id="technical-highlights"></a>
-## ✨ Technical Highlights & Engineering Decisions
+### Technical highlights
 
-[Back to Table of Contents](#toc)
+- **Hexagonal Architecture:** strict separation of domain, application, and infrastructure layers.
+- **Transactional Outbox:** payment state and integration event are saved in one transaction.
+- **ShedLock:** prevents multiple instances from processing the same outbox events.
+- **Virtual Threads:** enabled through Spring Boot 4.0.5 and Java 25 for better I/O concurrency.
+- **Resilience4j:** retry and circuit breaker protect outbound TPay calls.
+- **Webhook verification:** incoming TPay notifications are validated with cryptographic signature checks.
+- **Optimized Docker build:** multi-stage build, layered JAR, container-friendly JVM tuning.
 
-* **Hexagonal Architecture (Ports & Adapters):** Strict boundary between domain, application, and infrastructure layers. Business logic is fully decoupled from frameworks, databases, and external APIs — enabling independent testability and easy adapter swapping.
-* **Transactional Outbox Pattern:** Payment state changes and outbox events are persisted in a single database transaction, guaranteeing eventual consistency and eliminating the dual-write problem. The `OutboxProcessor` polls and dispatches pending events reliably.
-* **Distributed Lock with ShedLock:** The `OutboxProcessor` uses ShedLock (JDBC-backed) to ensure that only one instance processes outbox events at a time — critical for horizontal scaling without duplicate event delivery.
-* **Virtual Threads (Project Loom):** Spring Boot is configured with `spring.threads.virtual.enabled=true`, leveraging Java 25 virtual threads to maximize throughput on I/O-bound payment gateway calls without the overhead of platform thread pools.
-* **Resilience4j — Retry & Circuit Breaker on TPay calls:** All outbound TPay API calls (OAuth token fetch and transaction verification) are protected by Resilience4j policies defined in `TPayResilienceOperations`. Each operation has a dedicated **Retry** instance (max 2 attempts, 200–300 ms back-off) and a **Circuit Breaker** instance (sliding window of 10 calls, minimum 5 calls required, opens at ≥ 50 % failure rate, stays open for 20 s). Only `TPayTemporaryUnavailableException` (thrown on 5xx / network errors) triggers retries and records failures; `IllegalStateException` (permanent errors) is ignored by both policies. When the circuit is open, a fallback method converts `CallNotPermittedException` into a clear `IllegalStateException`, making the failure visible to the caller without silent data loss.
-* **Secure Notification Verification:** Incoming TPay webhook notifications are validated using cryptographic signature verification (`commons-codec`), protecting against spoofed payment callbacks.
-* **Optimized Docker Build:** Multi-stage Dockerfile with Maven dependency caching and Spring Boot layered JAR extraction, resulting in fast rebuilds and minimal runtime image size.
-
-<a id="tech-stack"></a>
 ## 💻 Tech Stack
 
-[Back to Table of Contents](#toc)
+| Layer | Technology |
+|---|---|
+| Language | Java 25 |
+| Framework | Spring Boot 4.0.5, Spring Data JPA, Spring WebMVC, Spring Validation |
+| Database | MySQL 9.6.0 |
+| Payment Gateway | TPay API |
+| Scheduling | ShedLock 6.0.2 |
+| Resilience | Resilience4j 2.4.0 |
+| Build Tool | Maven 3.9, JaCoCo 0.8.14 |
+| Containerization | Docker, Docker Compose v2+ |
+| CI | GitHub Actions, Codecov |
+| Observability | Spring Boot Actuator |
+| Other | Lombok, Commons Codec, Spring RestClient, SpringDoc OpenAPI |
 
-| Layer              | Technology                                                           |
-|--------------------|----------------------------------------------------------------------|
-| **Language**       | Java 25                                                              |
-| **Framework**      | Spring Boot 4.0.5, Spring Data JPA, Spring WebMVC, Spring Validation |
-| **Database**       | MySQL 9.6.0 (HikariCP connection pool)                               |
-| **Payment Gateway**| TPay API (OAuth2 + REST)                                             |
-| **Scheduling**     | ShedLock 6.0.2 (JDBC provider)                                       |
-| **Resilience**     | Resilience4j 2.2.0 (Retry + CircuitBreaker)                          |
-| **Build Tool**     | Maven 3.9, JaCoCo 0.8.14                                             |
-| **Containerization**| Docker (multi-stage build), Docker Compose                           |
-| **CI/CD**          | GitHub Actions, Codecov                                              |
-| **Observability**  | Spring Boot Actuator                                                 |
-| **Other**          | Lombok, Commons Codec, Spring RestClient                             |
+## 🧪 Testing Strategy
 
-<a id="testing-strategy"></a>
-## 🧪 Testing Strategy & Quality Assurance
+The project uses a clear testing pyramid with unit and integration tests separated by Maven plugins.
 
-[Back to Table of Contents](#toc)
+- **Unit tests:** `*Test.java` run with Surefire during `mvn test`.
+- **Integration tests:** `*IT.java` run with Failsafe during `mvn verify`.
+- **Coverage gate:** JaCoCo enforces a minimum of **80% instruction coverage**.
+- **Reports:** HTML report is generated at `target/site/jacoco/index.html`.
 
-The project employs a robust testing pyramid with clear separation between unit and integration tests:
-
-* **Unit Tests (18 classes):** Pure domain and infrastructure logic tested in isolation — covering domain models (`Payment`, `OutboxEvent`), custom exceptions, mappers, adapters, and the `OutboxProcessor`/`OutboxEventSender` pipeline. All tests use JUnit 5 and Mockito.
-* **Code Coverage Gate:** JaCoCo enforces a strict minimum of **80% instruction coverage** at the bundle level — the build fails if coverage drops below the threshold.
-
-### Test execution details
-
-- **Unit tests:** All classes matching `*Test.java` are executed by the Maven Surefire plugin during the `test` phase (`mvn test`).
-- **Integration tests:** All classes matching `*IT.java` are executed by the Maven Failsafe plugin during the `integration-test` and `verify` phases (`mvn verify`).
-- In the CI pipeline, unit and integration tests are run as separate steps (see `.github/workflows/ci_cd.yml`).
-- This separation is configured in `pom.xml` using the Surefire and Failsafe plugins with appropriate includes.
-
-### How to run tests
-
-Run all tests (fast local check):
+Run tests:
 
 ```bash
 mvn test
-```
-
-Run all tests with JaCoCo report + coverage gate (same as CI quality gate):
-
-```bash
 mvn verify
 ```
 
-### How to interpret JaCoCo report
-
-- HTML report: `target/site/jacoco/index.html`
-- XML report (used by CI tools): `target/site/jacoco/jacoco.xml`
-- Quality gate in `pom.xml`: **BUNDLE / INSTRUCTION / COVEREDRATIO >= 0.80**
-- If coverage is below 80%, `mvn verify` fails in `jacoco:check`
-
-Read the HTML report top-down: start with package and class coverage, then prioritize classes with the lowest instruction coverage in the core payment flow.
-
-
-<a id="cicd-pipeline"></a>
 ## 🛡️ CI/CD Pipeline
 
-[Back to Table of Contents](#toc)
+GitHub Actions runs the build and tests on push and pull request to `master`.  
+The pipeline generates JaCoCo reports, uploads artifacts, and sends coverage data to Codecov.
 
-The project uses **GitHub Actions** for Continuous Integration with automated quality gates:
-
-```yaml
-# Triggered on push/PR to master
-- Checkout code
-- Set up Java 25 (Temurin)
-- Build & run tests (mvn verify)
-- Upload JaCoCo coverage report (artifact, 7-day retention)
-- Upload coverage to Codecov (fail_ci_if_error: true)
-```
-
-* **Build:** Maven `verify` phase runs all unit tests with JaCoCo instrumentation.
-* **Coverage Reporting:** JaCoCo HTML report is uploaded as a build artifact; XML report is pushed to Codecov for trend tracking and PR annotations.
-* **Quality Gate:** Both JaCoCo (80% minimum) and Codecov (`fail_ci_if_error: true`) act as hard gates — a failing coverage check blocks the pipeline.
-
-<a id="observability"></a>
 ## 📊 Observability
 
-[Back to Table of Contents](#toc)
+The service exposes health endpoints through Spring Boot Actuator.  
+`/actuator/health` is used for Docker health checks and orchestration probes.
 
-The service exposes health and readiness endpoints via **Spring Boot Actuator**:
-
-* **Health Endpoint:** `GET /actuator/health` — used by Docker healthcheck (`wget -qO- http://localhost:8081/actuator/health`) and orchestrators for readiness probing.
-* **Custom Health Check:** `GET /health` — application-level health check controller returning service status.
-* **JVM Tuning:** Container-aware JVM settings (`-XX:+UseContainerSupport`, `-XX:MaxRAMPercentage=75.0`, G1GC) ensure stable memory behavior under constrained Docker resources.
-
-<a id="repository-structure"></a>
 ## 📂 Repository Structure
-
-[Back to Table of Contents](#toc)
 
 ```text
 .
 ├── .github/
 │   └── workflows/
-│       └── ci_cd.yml              # CI/CD pipeline: builds, tests, generates coverage reports and automatically deploys to GCP VM
+│       └── ci.yml
 ├── src/
 │   ├── main/
 │   │   ├── java/
 │   │   │   └── com/rzodeczko/paymentservice/
-│   │   │       ├── application/        # use case logic, input/output ports
-│   │   │       ├── domain/             # domain model, entities, exceptions
-│   │   │       ├── infrastructure/     # adapters for database, TPay, external integrations
-│   │   │       └── presentation/       # REST controllers, HTTP request handling
+│   │   │       ├── application/
+│   │   │       ├── domain/
+│   │   │       ├── infrastructure/
+│   │   │       └── presentation/
 │   │   └── resources/
-│   │       ├── application.yaml        # main Spring Boot configuration file
+│   │       ├── application.yaml
 │   │       └── db/
-│   │           └── changelog/          # Liquibase migration scripts
+│   │           └── changelog/
 │   └── test/
-│       ├── java/                       # unit and integration tests
+│       ├── java/
 │       └── resources/
-│           ├── application-test.yml    # test configuration
-│           └── schema.sql              # test database schema
-├── .env.example                       # example environment variables
-├── .env.template                      # .env template for automatic environment generation (CI/CD)
-├── .gitignore
-├── docker-compose.yml                 # service and dependency definitions (database, app, swagger)
-├── Dockerfile                         # multi-stage application image build
-├── openapi.template.yaml              # OpenAPI 3.0 spec template, dynamically generated based on environment
-├── pom.xml                            # Maven configuration, dependencies, profiles, tests
+├── .env.example
+├── docker-compose.yml
+├── Dockerfile
+├── pom.xml
 └── README.md
 ```
 
-#
-# Test execution details:
-#
-# - Unit tests: All classes matching *Test.java are executed by the Maven Surefire plugin during the 'test' phase (mvn test).
-# - Integration tests: All classes matching *IT.java are executed by the Maven Failsafe plugin during the 'integration-test' and 'verify' phases (mvn verify).
-# - In the CI pipeline, unit and integration tests are run as separate steps (see .github/workflows/ci_cd.yml).
-# - This separation is configured in pom.xml using the Surefire and Failsafe plugins with appropriate includes.
-#
+## 🔮 Future Roadmap
 
-<a id="future-roadmap"></a>
-## 🔮 Future Roadmap (Architectural Evolution)
+Planned improvements include:
 
-[Back to Table of Contents](#toc)
+- Testcontainers for isolated integration tests.
+- Kafka or RabbitMQ instead of polling for outbox delivery.
+- OpenTelemetry tracing.
+- Prometheus metrics.
 
-Planned iterations for system evolution include:
-
-* **Testcontainers:** Ephemeral MySQL instances in integration tests via [Testcontainers](https://testcontainers.com/) — fully isolated, reproducible runs without external DB dependencies.
-* **Event-Driven Outbox:** Transitioning from polling (`OutboxProcessor`) to a message broker (Kafka/RabbitMQ) for lower latency event dispatch.
-
-
-
-<a id="deployment-vm"></a>
-## 🚀 Deployment to a Virtual Machine (VM)
-[Back to Table of Contents](#toc)
-
-The current deployment to a GCP virtual machine is for testing/demonstrating purposes only. In production, the entire microservices suite (order, invoice, payments, security) will be deployed using Kubernetes.
-
-The production host address isn’t public for security reasons. If you’d like access, please contact me.
-
-- The deployment process is fully automated and secure.
-- All secrets and environment variables are managed outside the repository.
-- For details, see the `.github/workflows/` directory.
-
-
-<a id="contact"></a>
 ## 🤝 Contact
-[Back to Table of Contents](#toc)
 
-Designed and implemented by **Michał Rzodeczko**.
-Feel free to check out my other projects on [GitHub](https://github.com/CoderNoOne).
-
+Designed and implemented by **Michał Rzodeczko**.  
+GitHub: [CoderNoOne](https://github.com/CoderNoOne)

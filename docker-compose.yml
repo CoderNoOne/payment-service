@@ -50,10 +50,10 @@ services:
   # PAYMENT SERVICE
   # --------------------------------------------------------------------------------------------------------------------
   payment-service:
-#    image:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: mrzodeczko/payments-service:1.0.0  # Use pre-built image for faster startup;
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
     restart: on-failure:5
     ports:
       - "${PAYMENT_SERVICE_PORT}:8081"
@@ -90,9 +90,6 @@ services:
         max-file: "3"
     networks:
       - mr-network
-
-
-
 
 volumes:
   payment-mysql:
