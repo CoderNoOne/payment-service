@@ -17,16 +17,63 @@ The project showcases modern backend engineering practices: Hexagonal Architectu
 
 This is the end-to-end payment flow:
 
-1. The client calls `POST /payments/init`.
-2. The service validates the request and creates a TPay transaction.
-3. TPay returns a redirect URL and external transaction ID.
-4. The customer completes payment on the TPay checkout page.
-5. TPay sends a webhook to `POST /payments/notification`.
-6. The service verifies the signature, updates the payment state, and stores an outbox event in the same database transaction.
-7. `OutboxProcessor` polls pending events and sends notifications to the external notification service.
-8. Successful delivery marks the outbox event as sent; failed delivery leaves it pending for retry.
+1. **Client → Payment Service:** Client sends a POST request to `/payments/init` to initialize a payment with order details (orderId, amount, email, name).
+2. **Payment Service → TPay:** Payment Service calls TPay API to create a new transaction.
+3. **TPay → Payment Service:** TPay responds with a transaction ID and redirect URL for customer checkout.
+4. **Payment Service → Client:** Payment Service returns the payment ID and redirect URL to the client.
+5. **Client → TPay:** Client redirects the customer to the TPay-hosted checkout page using the provided redirect URL.
+6. **TPay → Payment Service:** After payment completion, TPay sends a POST webhook to `/payments/notification` with payment status details.
+7. **Payment Service (internal):** Payment Service verifies the notification signature using the security code to ensure authenticity.
+8. **Payment Service → Database:** Payment Service updates the payment state in the database based on the notification data.
+9. **Payment Service → Database:** Payment Service saves an outbox event in the same database transaction to ensure consistency.
+10. **OutboxProcessor → Database:** OutboxProcessor polls the database for pending outbox events that need to be sent.
+11. **Database → OutboxProcessor:** Database returns the list of pending outbox events to the OutboxProcessor.
+12. **OutboxProcessor → External Notification Service:** OutboxProcessor sends the event notification to the external notification service.
+13. **(Alternative: Delivery successful) OutboxProcessor → Database:** If delivery succeeds, OutboxProcessor marks the outbox event as sent in the database.
+14. **(Alternative: Delivery failed) OutboxProcessor → Database:** If delivery fails, OutboxProcessor leaves the outbox event pending for retry in the next polling cycle.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant PS as Payment Service
+    participant T as TPay
+    participant DB as Database
+    participant OP as OutboxProcessor
+    participant NS as External Notification Service
+
+    C->>PS: POST /payments/init
+    PS->>T: Create transaction
+    T-->>PS: transactionId + redirectUrl
+    PS-->>C: paymentId + redirectUrl
+
+    C->>T: Redirect customer to checkout
+    T-->>PS: POST /payments/notification
+
+    PS->>PS: Verify notification signature
+    PS->>DB: Update payment state
+    PS->>DB: Save outbox event\n(same transaction)
+
+    OP->>DB: Poll pending outbox events
+    DB-->>OP: Pending events
+    OP->>NS: Send event notification
+
+    alt Delivery successful
+        OP->>DB: Mark outbox event as sent
+    else Delivery failed
+        OP->>DB: Leave event pending
+    end
+```
+
 
 This approach keeps the payment state consistent even when external systems are temporarily unavailable.
+
+
+
+
+
+
+
 
 ## 🌐 API Endpoints
 
