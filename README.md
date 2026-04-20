@@ -4,7 +4,7 @@
  [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
  [![Resilience4j](https://img.shields.io/badge/Resilience4j-2.4.0-informational.svg)](https://resilience4j.readme.io/)
  [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-[![codecov](https://codecov.io/gh/CoderNoOne/payment-service/branch/master/graph/badge.svg)](https://codecov.io/gh/CoderNoOne/payment-service)
+[![codecov](https://codecov.io/gh/mrzodeczko-dev/payment-service/branch/master/graph/badge.svg)](https://codecov.io/gh/mrzodeczko-dev/payment-service)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 📖 Overview
