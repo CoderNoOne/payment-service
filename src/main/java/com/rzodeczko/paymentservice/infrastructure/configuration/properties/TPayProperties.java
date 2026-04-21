@@ -29,6 +29,6 @@ public record TPayProperties(Api api, App app) {
      * @param returnSuccessUrl payer redirect URL used after successful payment completion
      * @param returnErrorUrl payer redirect URL used when payment processing fails
      */
-    public record App(String notificationUrl, String returnSuccessUrl, String returnErrorUrl) {
+    public record App(String notificationUrl, String returnSuccessUrl, String returnErrorUrl, String externalServiceUrl) {
     }
 }

@@ -50,6 +50,7 @@ tpay:
     notification-url: ${TPAY_APP_NOTIFICATION_URL}
     return-success-url: ${TPAY_APP_RETURN_SUCCESS_URL}
     return-error-url: ${TPAY_APP_RETURN_ERROR_URL}
+    external-service-url: ${TPAY_APP_EXTERNAL_SERVICE_URL}
 
 resilience4j:
   retry:
